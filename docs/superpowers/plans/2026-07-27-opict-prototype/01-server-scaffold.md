@@ -10,7 +10,7 @@
 - `GET /api/health` → `200 {"ok":true}`
 - npm scripts: `npm run dev`(서버 기동), `npm test`(node:test)
 
-- [ ] **Step 1: 프로젝트 초기화**
+- [x] **Step 1: 프로젝트 초기화**
 
 ```bash
 mkdir server && cd server
@@ -33,7 +33,7 @@ npm i fastify better-sqlite3 @fastify/static @fastify/multipart
 
 루트 `.gitignore`에 추가(없는 줄만): `node_modules/`, `server/data/`, `web/dist/`, `.env`
 
-- [ ] **Step 2: 실패하는 테스트 작성** — `server/test/health.test.js`
+- [x] **Step 2: 실패하는 테스트 작성** — `server/test/health.test.js`
 
 ```js
 import { test } from 'node:test';
@@ -49,12 +49,12 @@ test('GET /api/health returns ok', async () => {
 });
 ```
 
-- [ ] **Step 3: 실패 확인**
+- [x] **Step 3: 실패 확인**
 
 Run: `cd server && npm test`
 Expected: FAIL (`Cannot find module '../src/app.js'`)
 
-- [ ] **Step 4: 스키마 작성** — `server/src/schema.sql` (spec §4 그대로, 6개 테이블)
+- [x] **Step 4: 스키마 작성** — `server/src/schema.sql` (spec §4 그대로, 6개 테이블)
 
 ```sql
 CREATE TABLE IF NOT EXISTS categories (
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 ```
 
-- [ ] **Step 5: db.js / app.js / server.js 구현**
+- [x] **Step 5: db.js / app.js / server.js 구현**
 
 `server/src/db.js`:
 
@@ -162,12 +162,12 @@ const app = await buildApp({ logger: true });
 await app.listen({ port: Number(process.env.PORT ?? 3000), host: '0.0.0.0' });
 ```
 
-- [ ] **Step 6: 테스트 통과 확인**
+- [x] **Step 6: 테스트 통과 확인**
 
 Run: `cd server && npm test`
 Expected: PASS (1 test)
 
-- [ ] **Step 7: 커밋**
+- [x] **Step 7: 커밋**
 
 ```bash
 git add .gitignore server/
