@@ -15,3 +15,23 @@ export type Correction = {
   created_at: string;
 };
 export type CorrectionResult = { corrected: string; alternatives: { text: string; note_ko: string }[]; explanation_ko: string };
+export type Attempt = {
+  id: number;
+  question_id: number;
+  question_text?: string;
+  audio_path: string;
+  transcript: string | null;
+  cli: string;
+  model: string;
+  status: string;
+  result_json: string | null;
+  raw_output: string | null;
+  error_message: string | null;
+  created_at: string;
+};
+export type EvalResult = {
+  summary_ko: string;
+  strengths_ko: string[];
+  improvements_ko: string[];
+  recommended_expressions: { text: string; note_ko: string }[];
+};
