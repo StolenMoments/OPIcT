@@ -46,7 +46,7 @@ test('attempt pipeline: upload → transcribe → evaluate → done', async (t) 
   form.append('audio', new Blob([Buffer.from('fake-webm')], { type: 'audio/webm' }), 'a.webm');
   form.append('question_id', String(q.id));
   form.append('cli', 'claude');
-  form.append('model', 'claude-sonnet-5');
+  form.append('model', 'claude-haiku-4-5-20251001');
   const res = await app.inject({ method: 'POST', url: '/api/attempts', body: form });
   assert.equal(res.statusCode, 202);
 
@@ -64,7 +64,7 @@ test('POST /api/attempts rejects invalid question_id without leaving an orphaned
   form.append('audio', new Blob([Buffer.from('fake-webm')], { type: 'audio/webm' }), 'a.webm');
   form.append('question_id', '999999');
   form.append('cli', 'claude');
-  form.append('model', 'claude-sonnet-5');
+  form.append('model', 'claude-haiku-4-5-20251001');
   const res = await app.inject({ method: 'POST', url: '/api/attempts', body: form });
   assert.equal(res.statusCode, 400);
 });
@@ -77,7 +77,7 @@ test('GET /api/attempts/:id 404 for missing id', async (t) => {
 });
 ```
 
-> 참고(컨트롤러 결정): 브리프 초안의 `claude-fable-5`는 실제 CLI 모델 allowlist(`server/src/ai/clis.js`)에 없는 모델 id라 `claude-sonnet-5`로 교체. 또한 400 경로에서 업로드 파일이 남지 않는지, 존재하지 않는 id에 404를 반환하는지 검증하는 테스트 2개를 추가했다.
+> 참고(컨트롤러 결정): 브리프 초안의 `claude-fable-5`는 실제 CLI 모델 allowlist(`server/src/ai/clis.js`)에 없는 모델 id라 `claude-haiku-4-5-20251001`로 교체. 또한 400 경로에서 업로드 파일이 남지 않는지, 존재하지 않는 id에 404를 반환하는지 검증하는 테스트 2개를 추가했다.
 
 > 참고: `app.inject`는 undici `FormData`/`Blob`(Node 22 내장)을 multipart body로 지원한다.
 

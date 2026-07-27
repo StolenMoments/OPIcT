@@ -7,7 +7,7 @@
 **Interfaces:**
 - Consumes: `app.repos`(01)
 - Produces:
-  - `CLIS` (`ai/clis.js`): `{ claude: {label, models: string[], argv(model): string[], extract(stdout): string}, codex: {...}, agy: {...} }` — 모델 목록의 단일 출처.
+  - `CLIS` (`ai/clis.js`): `{ claude: {label, models: string[], promptMode: 'stdin'|'argv', argv(model, prompt?): string[], extract(stdout): string}, codex: {...}, agy: {...} }` — 모델 목록·플래그의 단일 출처. `promptMode`가 `'argv'`면 프롬프트를 stdin이 아니라 인자로 넘긴다(agy).
   - `runCli({cli, model, prompt, timeoutMs?}) → Promise<string>` (`ai/runner.js`) — stdout 원문 반환. 환경변수 `OPICT_CLI_STUB`가 있으면 어떤 cli든 `node $OPICT_CLI_STUB`를 실행(테스트용).
   - `lenientJson(text) → object | null` (`ai/parse.js`)
   - `enqueue(fn) → Promise` (`ai/queue.js`) — 서버 전역 직렬 큐. **평가 파이프라인(09)도 이 큐를 사용.**
@@ -79,22 +79,26 @@ export function enqueue(fn) {
 export const CLIS = {
   claude: {
     label: 'Claude Code',
-    models: ['claude-sonnet-5'],
-    argv: (model) => ['claude', '-p', '--model', model, '--output-format', 'json',
-      '--disallowedTools', '*', '--no-session'],
+    models: ['claude-haiku-4-5-20251001'],
+    promptMode: 'stdin',
+    argv: (model) => ['claude', '-p', '--model', model, '--effort', 'low',
+      '--output-format', 'json', '--disallowedTools', '*', '--no-session'],
     // claude는 {result: "..."} 봉투로 출력 → result만 꺼냄. 실패 시 원문 그대로.
     extract: (stdout) => { try { return JSON.parse(stdout).result ?? stdout; } catch { return stdout; } },
   },
   codex: {
     label: 'Codex CLI',
     models: ['gpt-5.6-luna'],
-    argv: (model) => ['codex', 'exec', '-m', model, '--skip-git-repo-check', '-'],
+    promptMode: 'stdin',
+    argv: (model) => ['codex', 'exec', '-m', model,
+      '-c', 'model_reasoning_effort="low"', '--skip-git-repo-check', '-'],
     extract: (stdout) => stdout,
   },
   agy: {
     label: 'Antigravity CLI',
     models: ['gemini-3.6-flash'],
-    argv: (model) => ['agy', '-p', '--model', model],
+    promptMode: 'argv',
+    argv: (model, prompt) => ['agy', '-p', prompt, '--model', model, '--effort', 'low'],
     extract: (stdout) => stdout,
   },
 };
@@ -131,37 +135,75 @@ import { CLIS } from './clis.js';
 const sandbox = join(tmpdir(), 'opict-sandbox');
 mkdirSync(sandbox, { recursive: true });
 
+// 프롬프트를 인자로 넘기는 CLI(agy)는 명령줄에 개행을 실을 수 없다. 줄을 공백으로 접는다.
+const flattenPrompt = (prompt) => String(prompt).replace(/\s*\n\s*/g, ' ').trim();
+
+// cmd.exe 경유 실행용 인용. 셸이 인자를 다시 쪼개지 않도록 우리가 직접 감싼다.
+// 주의: cmd.exe는 따옴표 안에서도 %VAR%를 확장하므로, 프롬프트에 %가 들어가면 그대로 넘어가지 않는다.
+const quoteForCmd = (arg) => `"${String(arg).replace(/"/g, '""')}"`;
+
+/**
+ * 실제로 spawn할 명령·인자·옵션을 만든다. 테스트에서 조립 결과만 검증할 수 있도록 분리.
+ */
+export function buildInvocation({ cli, model, prompt, stub }) {
+  const def = CLIS[cli];
+  if (stub) {
+    // 테스트 스텁은 항상 stdin으로 프롬프트를 받는다.
+    return { cmd: process.execPath, args: [stub], opts: {}, stdinPrompt: prompt };
+  }
+
+  if (def.promptMode !== 'argv') {
+    const [cmd, ...args] = def.argv(model);
+    // Windows에서 CLI들은 .cmd 셈으로 설치되므로 셸을 거쳐야 실행된다.
+    return { cmd, args, opts: { shell: process.platform === 'win32' }, stdinPrompt: prompt };
+  }
+
+  const parts = def.argv(model, flattenPrompt(prompt));
+  if (process.platform !== 'win32') {
+    const [cmd, ...args] = parts;
+    return { cmd, args, opts: {}, stdinPrompt: null };
+  }
+  // shell:true는 인자를 그대로 이어붙여 프롬프트가 명령줄로 새어나간다.
+  // cmd.exe를 직접 띄우고 인용은 우리가 하되, Node가 다시 손대지 않도록 verbatim으로 넘긴다.
+  return {
+    cmd: process.env.ComSpec || 'cmd.exe',
+    args: ['/d', '/s', '/c', `"${parts.map(quoteForCmd).join(' ')}"`],
+    opts: { windowsVerbatimArguments: true },
+    stdinPrompt: null,
+  };
+}
+
 export function runCli({ cli, model, prompt, timeoutMs = 180_000 }) {
   const def = CLIS[cli];
   if (!def) return Promise.reject(new Error(`알 수 없는 CLI: ${cli}`));
-  const stub = process.env.OPICT_CLI_STUB;
-  const [cmd, ...args] = stub ? [process.execPath, stub] : def.argv(model);
+  const { cmd, args, opts, stdinPrompt } = buildInvocation({
+    cli, model, prompt, stub: process.env.OPICT_CLI_STUB,
+  });
 
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { cwd: sandbox, shell: !stub && process.platform === 'win32' });
+    const child = spawn(cmd, args, { cwd: sandbox, ...opts });
     let out = '', err = '', settled = false;
-    // close/timeout/spawn-error 중 무엇이 먼저 오든 프라미스는 딱 한 번만 정착한다.
     const settleResolve = (v) => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } };
     const settleReject = (e) => { if (!settled) { settled = true; clearTimeout(timer); reject(e); } };
     const timer = setTimeout(() => {
       child.kill();
       const e = new Error(`CLI 타임아웃 (${timeoutMs / 1000}초)`);
-      e.rawOutput = out; // 타임아웃 이전까지의 stdout도 보존 — 폐기 금지
+      e.rawOutput = out;
       settleReject(e);
     }, timeoutMs);
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (err += d));
     child.on('error', (e) => { e.rawOutput = out; settleReject(e); });
-    child.stdin.on('error', () => { /* EPIPE 등 — close/error 핸들러가 최종 처리하므로 여기서는 삼킨다 */ });
+    child.stdin.on('error', () => { /* EPIPE 등 — close/error 핸들러가 최종 처리 */ });
     child.on('close', (code) => {
       if (code !== 0) {
         const e = new Error(`CLI 종료코드 ${code}: ${err.slice(0, 500)}`);
-        e.rawOutput = out; // 비정상 종료 이전까지의 stdout도 보존 — 폐기 금지
+        e.rawOutput = out;
         return settleReject(e);
       }
       settleResolve(def.extract(out));
     });
-    child.stdin.write(prompt);
+    if (stdinPrompt !== null) child.stdin.write(stdinPrompt);
     child.stdin.end(); // agy Windows hang 대응 — 반드시 즉시 닫기
   });
 }
@@ -206,7 +248,7 @@ test('correction pipeline with stub cli', async (t) => {
   t.after(() => app.close());
 
   const res = await app.inject({ method: 'POST', url: '/api/corrections',
-    payload: { input_text: 'I am jogging since two years.', cli: 'claude', model: 'claude-sonnet-5' } });
+    payload: { input_text: 'I am jogging since two years.', cli: 'claude', model: 'claude-haiku-4-5-20251001' } });
   assert.equal(res.statusCode, 202);
 
   const row = await waitDone(app, `/api/corrections/${res.json().id}`);
@@ -303,7 +345,7 @@ export async function correctionsRoutes(app) {
   app.post('/api/corrections', async (req, reply) => {
     const { input_text, cli, model } = req.body ?? {};
     // model은 해당 cli의 CLIS[cli].models 화이트리스트에 있는 값만 허용 —
-    // shell:true(Windows)로 spawn되는 argv에 그대로 흘러들어가므로 임의 문자열 통과 금지.
+    // Windows에서 셸/명령줄을 거쳐 spawn되는 argv에 그대로 흘러들어가므로 임의 문자열 통과 금지.
     if (!input_text?.trim() || !CLIS[cli] || !model || !CLIS[cli].models.includes(model))
       return reply.code(400).send({ error: 'input_text, cli(claude|codex|agy), model(해당 cli의 지원 모델)은 필수입니다' });
     const row = repos.corrections.create({ input_text: input_text.trim(), cli, model });
@@ -350,7 +392,7 @@ cd server && npm run dev
 curl localhost:3000/api/meta/clis     # CLI 3종·모델 목록
 # 실제 CLI 검증 (claude 로그인 상태 필요):
 curl -X POST localhost:3000/api/corrections -H "content-type: application/json" ^
-  -d "{\"input_text\":\"I am jogging since two years.\",\"cli\":\"claude\",\"model\":\"claude-sonnet-5\"}"
+  -d "{\"input_text\":\"I am jogging since two years.\",\"cli\":\"claude\",\"model\":\"claude-haiku-4-5-20251001\"}"
 # → {"id":1} 반환 후:
 curl localhost:3000/api/corrections/1  # status가 pending→running→done으로 변하고 result_json 채워짐
 ```

@@ -25,7 +25,7 @@ process.env.OPICT_CLI_STUB = fileURLToPath(new URL('./fixtures/stub-cli.js', imp
 test('settings upsert and read', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());
-  await app.inject({ method: 'PUT', url: '/api/settings', payload: { default_cli: 'claude', default_model_claude: 'claude-sonnet-5' } });
+  await app.inject({ method: 'PUT', url: '/api/settings', payload: { default_cli: 'claude', default_model_claude: 'claude-haiku-4-5-20251001' } });
   const res = await app.inject({ url: '/api/settings' });
   assert.equal(res.json().default_cli, 'claude');
 });
@@ -33,12 +33,12 @@ test('settings upsert and read', async (t) => {
 test('correction falls back to default cli/model', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());
-  await app.inject({ method: 'PUT', url: '/api/settings', payload: { default_cli: 'claude', default_model_claude: 'claude-sonnet-5' } });
+  await app.inject({ method: 'PUT', url: '/api/settings', payload: { default_cli: 'claude', default_model_claude: 'claude-haiku-4-5-20251001' } });
   const res = await app.inject({ method: 'POST', url: '/api/corrections', payload: { input_text: 'hello' } });
   assert.equal(res.statusCode, 202);
   const row = (await app.inject({ url: `/api/corrections/${res.json().id}` })).json();
   assert.equal(row.cli, 'claude');
-  assert.equal(row.model, 'claude-sonnet-5');
+  assert.equal(row.model, 'claude-haiku-4-5-20251001');
 });
 
 test('PUT /api/settings rejects unknown default_cli', async (t) => {
@@ -49,7 +49,7 @@ test('PUT /api/settings rejects unknown default_cli', async (t) => {
 });
 ```
 
-Note: each CLI in `server/src/ai/clis.js` exposes exactly one model id (`claude → 'claude-sonnet-5'`, `codex → 'gpt-5.6-luna'`, `agy → 'gemini-3.6-flash'`); tests must use those ids or `POST /api/corrections`/`PUT /api/settings` will 400 on an unknown model.
+Note: each CLI in `server/src/ai/clis.js` exposes exactly one model id (`claude → 'claude-haiku-4-5-20251001'`, `codex → 'gpt-5.6-luna'`, `agy → 'gemini-3.6-flash'`); tests must use those ids or `POST /api/corrections`/`PUT /api/settings` will 400 on an unknown model.
 
 Run: `cd server && npm test` — Expected: FAIL
 

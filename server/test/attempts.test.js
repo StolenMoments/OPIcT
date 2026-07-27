@@ -26,7 +26,7 @@ test('attempt pipeline: upload → transcribe → evaluate → done', async (t) 
   form.append('audio', new Blob([Buffer.from('fake-webm')], { type: 'audio/webm' }), 'a.webm');
   form.append('question_id', String(q.id));
   form.append('cli', 'claude');
-  form.append('model', 'claude-sonnet-5');
+  form.append('model', 'claude-haiku-4-5-20251001');
   const res = await app.inject({ method: 'POST', url: '/api/attempts', body: form });
   assert.equal(res.statusCode, 202);
 
@@ -44,7 +44,7 @@ test('POST /api/attempts rejects invalid question_id without leaving an orphaned
   form.append('audio', new Blob([Buffer.from('fake-webm')], { type: 'audio/webm' }), 'a.webm');
   form.append('question_id', '999999');
   form.append('cli', 'claude');
-  form.append('model', 'claude-sonnet-5');
+  form.append('model', 'claude-haiku-4-5-20251001');
   const res = await app.inject({ method: 'POST', url: '/api/attempts', body: form });
   assert.equal(res.statusCode, 400);
 });

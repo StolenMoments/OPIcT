@@ -24,7 +24,7 @@ test('correction pipeline with stub cli', async (t) => {
   t.after(() => app.close());
 
   const res = await app.inject({ method: 'POST', url: '/api/corrections',
-    payload: { input_text: 'I am jogging since two years.', cli: 'claude', model: 'claude-sonnet-5' } });
+    payload: { input_text: 'I am jogging since two years.', cli: 'claude', model: 'claude-haiku-4-5-20251001' } });
   assert.equal(res.statusCode, 202);
 
   const row = await waitDone(app, `/api/corrections/${res.json().id}`);
@@ -56,7 +56,7 @@ test('unparseable cli output preserves raw_output', async (t) => {
   process.env.OPICT_CLI_STUB = STUB_BAD_JSON;
   try {
     const res = await app.inject({ method: 'POST', url: '/api/corrections',
-      payload: { input_text: 'I am jogging since two years.', cli: 'claude', model: 'claude-sonnet-5' } });
+      payload: { input_text: 'I am jogging since two years.', cli: 'claude', model: 'claude-haiku-4-5-20251001' } });
     assert.equal(res.statusCode, 202);
     const row = await waitDone(app, `/api/corrections/${res.json().id}`);
     assert.equal(row.status, 'error');
@@ -72,7 +72,7 @@ test('cli exiting non-zero after writing stdout preserves raw_output', async (t)
   process.env.OPICT_CLI_STUB = STUB_FAIL;
   try {
     const res = await app.inject({ method: 'POST', url: '/api/corrections',
-      payload: { input_text: 'I am jogging since two years.', cli: 'claude', model: 'claude-sonnet-5' } });
+      payload: { input_text: 'I am jogging since two years.', cli: 'claude', model: 'claude-haiku-4-5-20251001' } });
     assert.equal(res.statusCode, 202);
     const row = await waitDone(app, `/api/corrections/${res.json().id}`);
     assert.equal(row.status, 'error');
