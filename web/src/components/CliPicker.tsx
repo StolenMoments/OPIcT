@@ -4,11 +4,13 @@ import type { CliMeta } from '../types';
 
 export default function CliPicker(props: { cli: string; model: string; onChange: (cli: string, model: string) => void }) {
   const [metas, setMetas] = useState<CliMeta[]>([]);
+  const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     api<CliMeta[]>('/meta/clis').then((m) => {
       setMetas(m);
+      setErr(null);
       if (!props.cli && m.length) props.onChange(m[0].name, m[0].models[0]);
-    }).catch(() => {});
+    }).catch((e) => setErr(e instanceof Error ? e.message : String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const current = metas.find((m) => m.name === props.cli);
@@ -23,6 +25,7 @@ export default function CliPicker(props: { cli: string; model: string; onChange:
       <select value={props.model} onChange={(e) => props.onChange(props.cli, e.target.value)}>
         {current?.models.map((mo) => <option key={mo} value={mo}>{mo}</option>)}
       </select>
+      {err && <small style={{ color: 'crimson' }}> {err}</small>}
     </span>
   );
 }

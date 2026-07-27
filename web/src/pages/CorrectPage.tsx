@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
 import CliPicker from '../components/CliPicker';
 import CategoryPicker from '../components/CategoryPicker';
@@ -59,16 +59,24 @@ export default function CorrectPage() {
   const [cli, setCli] = useState('');
   const [model, setModel] = useState('');
   const [jobId, setJobId] = useState<number | null>(null);
-  const [status, setStatus] = useState<string | undefined>(undefined);
+  const [active, setActive] = useState(false);
 
-  const settled = status === 'done' || status === 'error';
-  const active = jobId != null && !settled;
+  const rawRow = usePolling<Correction>(() => api<Correction>(`/corrections/${jobId}`), active);
+  // rawRow can still hold the previous job's data for one render after a new
+  // job starts (usePolling's internal state isn't cleared on activation), so
+  // gate it on the current jobId before treating it as "the" row.
+  const row = rawRow?.id === jobId ? rawRow : null;
 
-  const row = usePolling<Correction>(
-    () => api<Correction>(`/corrections/${jobId}`).then((r) => { setStatus(r.status); return r; }),
-    active,
-  );
+  // settled/active are derived from `row`, which only ever reflects data that
+  // passed through usePolling's own `stopped` guard — never a mirrored,
+  // separately-raced side effect.
+  useEffect(() => {
+    if (row && (row.status === 'done' || row.status === 'error')) {
+      setActive(false);
+    }
+  }, [row]);
 
+  const settled = row?.status === 'done' || row?.status === 'error';
   const busy = jobId != null && !settled;
   const result = row?.status === 'done' ? safeParseResult(row.result_json) : null;
   const parseFailed = row?.status === 'done' && row.result_json != null && result === null;
@@ -79,8 +87,8 @@ export default function CorrectPage() {
       method: 'POST',
       body: JSON.stringify({ input_text: input, cli, model }),
     });
-    setStatus(undefined);
     setJobId(id);
+    setActive(true);
   });
 
   return (
