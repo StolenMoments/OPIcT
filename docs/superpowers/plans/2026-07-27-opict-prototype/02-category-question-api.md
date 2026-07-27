@@ -21,7 +21,7 @@
   - `DELETE /api/questions/:id` → `204`
   - 검증 실패는 `400 {error: "..."}`. 이 오류 형태를 이후 모든 라우트가 따른다.
 
-- [ ] **Step 1: 실패하는 테스트 작성** — `server/test/categories.test.js`
+- [x] **Step 1: 실패하는 테스트 작성** — `server/test/categories.test.js`
 
 ```js
 import { test } from 'node:test';
@@ -82,12 +82,12 @@ test('question crud + cascade', async (t) => {
 });
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 Run: `cd server && npm test`
 Expected: FAIL (404 — 라우트 없음)
 
-- [ ] **Step 3: repo 구현 (SQL은 여기에만)**
+- [x] **Step 3: repo 구현 (SQL은 여기에만)**
 
 `server/src/repo/categories.js`:
 
@@ -160,7 +160,7 @@ export function createRepos(db) {
 }
 ```
 
-- [ ] **Step 4: 라우트 구현 (repo만 사용, SQL 금지)**
+- [x] **Step 4: 라우트 구현 (repo만 사용, SQL 금지)**
 
 `server/src/routes/categories.js`:
 
@@ -229,12 +229,12 @@ await app.register(categoriesRoutes);
 await app.register(questionsRoutes);
 ```
 
-- [ ] **Step 5: 테스트 통과 확인**
+- [x] **Step 5: 테스트 통과 확인**
 
 Run: `cd server && npm test`
 Expected: PASS (health 포함 전부)
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add server/
