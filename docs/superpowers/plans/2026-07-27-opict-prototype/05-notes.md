@@ -37,6 +37,14 @@ test('sentence crud', async (t) => {
   const del = await app.inject({ method: 'DELETE', url: `/api/sentences/${created.json().id}` });
   assert.equal(del.statusCode, 204);
 });
+
+test('POST sentences with nonexistent category_id rejected with 400, not 500', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const res = await app.inject({ method: 'POST', url: '/api/sentences', payload: { category_id: 9999, text_en: 'hello' } });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.json().error, '존재하지 않는 category_id입니다');
+});
 ```
 
 - [ ] **Step 2: 실패 확인**
@@ -85,6 +93,8 @@ export async function sentencesRoutes(app) {
   app.post('/api/sentences', async (req, reply) => {
     const { category_id, text_en, memo = null, source = 'manual' } = req.body ?? {};
     if (!category_id || !text_en?.trim()) return reply.code(400).send({ error: 'category_id와 text_en은 필수입니다' });
+    if (!app.repos.categories.get(category_id))
+      return reply.code(400).send({ error: '존재하지 않는 category_id입니다' });
     return reply.code(201).send(repo.create({ category_id, text_en: text_en.trim(), memo, source }));
   });
 
@@ -117,36 +127,47 @@ import CategoryPicker from '../components/CategoryPicker';
 import type { Sentence } from '../types';
 
 export default function NotesPage() {
+  const [err, setErr] = useState<string | null>(null);
+  const guard = useCallback(async (fn: () => Promise<void>) => {
+    try {
+      await fn();
+      setErr(null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
   const [catId, setCatId] = useState<number | null>(null);
   const [items, setItems] = useState<Sentence[]>([]);
   const [textEn, setTextEn] = useState('');
   const [memo, setMemo] = useState('');
 
   const load = useCallback(() => {
-    if (catId) api<Sentence[]>(`/sentences?category_id=${catId}`).then(setItems);
+    if (catId) api<Sentence[]>(`/sentences?category_id=${catId}`).then(setItems).catch(() => {});
   }, [catId]);
   useEffect(() => { load(); }, [load]);
 
-  const add = async () => {
+  const add = () => guard(async () => {
     if (!catId || !textEn.trim()) return;
     await api('/sentences', { method: 'POST', body: JSON.stringify({ category_id: catId, text_en: textEn, memo: memo || null }) });
     setTextEn(''); setMemo(''); load();
-  };
-  const edit = async (s: Sentence) => {
+  });
+  const edit = (s: Sentence) => guard(async () => {
     const text_en = prompt('문장 수정', s.text_en);
     if (!text_en) return;
     await api(`/sentences/${s.id}`, { method: 'PUT', body: JSON.stringify({ text_en }) });
     load();
-  };
-  const remove = async (s: Sentence) => {
+  });
+  const remove = (s: Sentence) => guard(async () => {
     if (!confirm('삭제?')) return;
     await api(`/sentences/${s.id}`, { method: 'DELETE' });
     load();
-  };
+  });
 
   return (
     <div>
       <h2>표현 노트</h2>
+      {err && <p style={{ color: 'red' }}>{err}</p>}
       <CategoryPicker value={catId} onChange={setCatId} />
       {catId && (
         <>
