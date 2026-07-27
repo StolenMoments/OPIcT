@@ -1,4 +1,7 @@
 import Fastify from 'fastify';
+import fastifyStatic from '@fastify/static';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { createDb } from './db.js';
 import { createRepos } from './repo/index.js';
 import { categoriesRoutes } from './routes/categories.js';
@@ -11,5 +14,15 @@ export async function buildApp({ dbFile = 'data/opict.db', logger = false } = {}
   await app.register(categoriesRoutes);
   await app.register(questionsRoutes);
   app.addHook('onClose', async () => app.repos.close());
+
+  const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
+  if (existsSync(webDist)) {
+    await app.register(fastifyStatic, { root: webDist });
+    app.setNotFoundHandler((req, reply) =>
+      req.method === 'GET' && !req.url.startsWith('/api')
+        ? reply.sendFile('index.html')
+        : reply.code(404).send({ error: 'not found' }));
+  }
+
   return app;
 }
