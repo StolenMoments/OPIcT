@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
 import CategoryPicker from '../components/CategoryPicker';
+import CliPicker from '../components/CliPicker';
 import Button from '../components/ui/Button';
 import Field from '../components/ui/Field';
 import ErrorBanner from '../components/ui/ErrorBanner';
@@ -18,6 +19,28 @@ export default function SettingsPage() {
       setErr(e instanceof Error ? e.message : String(e));
     }
   }, []);
+
+  // 기본 CLI·모델
+  const [defCli, setDefCli] = useState('');
+  const [defModel, setDefModel] = useState('');
+  const [savedMsg, setSavedMsg] = useState('');
+  useEffect(() => {
+    api<Record<string, string>>('/settings').then((s) => {
+      if (s.default_cli) {
+        setDefCli(s.default_cli);
+        setDefModel(s[`default_model_${s.default_cli}`] ?? '');
+      }
+    });
+  }, []);
+  const saveDefaults = () =>
+    guard(async () => {
+      await api('/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ default_cli: defCli, [`default_model_${defCli}`]: defModel }),
+      });
+      setSavedMsg('저장됨 ✓');
+      setTimeout(() => setSavedMsg(''), 2000);
+    });
 
   // 카테고리 관리
   const [cats, setCats] = useState<Category[] | null>(null);
@@ -126,6 +149,17 @@ export default function SettingsPage() {
   return (
     <div className="page">
       {err && <ErrorBanner message={err} onDismiss={() => setErr(null)} />}
+
+      <div className="section">
+        <h2 className="section__title">기본 CLI·모델</h2>
+        <div className="section__row">
+          <CliPicker cli={defCli} model={defModel} onChange={(c, m) => { setDefCli(c); setDefModel(m); }} />
+          <Button variant="primary" onClick={saveDefaults} disabled={!defCli || !defModel}>
+            저장
+          </Button>
+          <span role="status" aria-live="polite">{savedMsg}</span>
+        </div>
+      </div>
 
       <div className="section">
         <h2 className="section__title">카테고리 관리</h2>

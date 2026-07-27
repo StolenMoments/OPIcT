@@ -100,6 +100,15 @@ export default function CorrectPage() {
     }
   }, [row]);
 
+  useEffect(() => {
+    api<Record<string, string>>('/settings').then((s) => {
+      if (s.default_cli) {
+        setCli(s.default_cli);
+        setModel(s[`default_model_${s.default_cli}`] ?? '');
+      }
+    });
+  }, []);
+
   const settled = row?.status === 'done' || row?.status === 'error';
   const busy = jobId != null && !settled;
   const result = row?.status === 'done' ? safeParseResult(row.result_json) : null;

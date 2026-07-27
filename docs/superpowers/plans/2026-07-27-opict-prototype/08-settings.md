@@ -25,7 +25,7 @@ process.env.OPICT_CLI_STUB = fileURLToPath(new URL('./fixtures/stub-cli.js', imp
 test('settings upsert and read', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());
-  await app.inject({ method: 'PUT', url: '/api/settings', payload: { default_cli: 'claude', default_model_claude: 'claude-fable-5' } });
+  await app.inject({ method: 'PUT', url: '/api/settings', payload: { default_cli: 'claude', default_model_claude: 'claude-sonnet-5' } });
   const res = await app.inject({ url: '/api/settings' });
   assert.equal(res.json().default_cli, 'claude');
 });
@@ -33,14 +33,23 @@ test('settings upsert and read', async (t) => {
 test('correction falls back to default cli/model', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());
-  await app.inject({ method: 'PUT', url: '/api/settings', payload: { default_cli: 'claude', default_model_claude: 'claude-fable-5' } });
+  await app.inject({ method: 'PUT', url: '/api/settings', payload: { default_cli: 'claude', default_model_claude: 'claude-sonnet-5' } });
   const res = await app.inject({ method: 'POST', url: '/api/corrections', payload: { input_text: 'hello' } });
   assert.equal(res.statusCode, 202);
   const row = (await app.inject({ url: `/api/corrections/${res.json().id}` })).json();
   assert.equal(row.cli, 'claude');
-  assert.equal(row.model, 'claude-fable-5');
+  assert.equal(row.model, 'claude-sonnet-5');
+});
+
+test('PUT /api/settings rejects unknown default_cli', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const res = await app.inject({ method: 'PUT', url: '/api/settings', payload: { default_cli: 'nope' } });
+  assert.equal(res.statusCode, 400);
 });
 ```
+
+Note: each CLI in `server/src/ai/clis.js` exposes exactly one model id (`claude → 'claude-sonnet-5'`, `codex → 'gpt-5.6-luna'`, `agy → 'gemini-3.6-flash'`); tests must use those ids or `POST /api/corrections`/`PUT /api/settings` will 400 on an unknown model.
 
 Run: `cd server && npm test` — Expected: FAIL
 
@@ -65,14 +74,27 @@ export function settingsRepo(db) {
 `server/src/routes/settings.js`:
 
 ```js
+import { CLIS } from '../ai/clis.js';
+
 export async function settingsRoutes(app) {
   app.get('/api/settings', async () => app.repos.settings.getAll());
-  app.put('/api/settings', async (req) => {
-    app.repos.settings.set(req.body ?? {});
+
+  app.put('/api/settings', async (req, reply) => {
+    const body = req.body ?? {};
+    if (body.default_cli !== undefined && !CLIS[body.default_cli])
+      return reply.code(400).send({ error: 'default_cli는 claude|codex|agy 중 하나여야 합니다' });
+    for (const cli of Object.keys(CLIS)) {
+      const key = `default_model_${cli}`;
+      if (body[key] !== undefined && !CLIS[cli].models.includes(body[key]))
+        return reply.code(400).send({ error: `${key}는 해당 cli의 지원 모델이어야 합니다` });
+    }
+    app.repos.settings.set(body);
     return app.repos.settings.getAll();
   });
 }
 ```
+
+`PUT /api/settings`는 `default_cli`/`default_model_<cli>` 키만 검증한다. 다른 키(예: 09에서 쓰는 `whisper_model`)는 그대로 통과시킨다(YAGNI — 그 키의 검증은 그 키를 도입하는 태스크의 책임).
 
 `repo/index.js`에 `settings: settingsRepo(db)` 추가, `app.js`에 등록.
 
@@ -83,8 +105,8 @@ export async function settingsRoutes(app) {
     const body = req.body ?? {};
     const s = repos.settings.getAll();
     const cli = body.cli ?? s.default_cli;
-    const model = body.model ?? s[`default_model_${cli}`];
-    if (!body.input_text?.trim() || !CLIS[cli] || !model)
+    const model = body.model ?? (CLIS[cli] ? s[`default_model_${cli}`] : undefined);
+    if (!body.input_text?.trim() || !CLIS[cli] || !model || !CLIS[cli].models.includes(model))
       return reply.code(400).send({ error: 'input_text 필수, cli/model 미지정 시 설정의 기본값이 있어야 합니다' });
     const row = repos.corrections.create({ input_text: body.input_text.trim(), cli, model });
     enqueue(() => runCorrection(repos, row.id));
@@ -92,13 +114,15 @@ export async function settingsRoutes(app) {
   });
 ```
 
+`cli`가 미지정이면 `undefined`가 될 수 있어, `CLIS[cli]`가 참일 때만 `s[\`default_model_${cli}\`]`를 조회한다 — 그렇지 않으면 `default_model_undefined`라는 무의미한 키를 찾게 되어 400 경로가 지저분해진다.
+
 - [ ] **Step 4: 테스트 통과 확인**
 
 Run: `cd server && npm test` — Expected: PASS
 
 - [ ] **Step 5: 설정 화면에 기본값 UI 추가** — `web/src/pages/SettingsPage.tsx` 상단에 섹션 추가
 
-기존 "카테고리 관리" 위에 렌더. CliPicker를 재사용해 기본 CLI·모델을 고르고 [저장]:
+기존 "카테고리 관리" 위에 렌더. CliPicker를 재사용해 기본 CLI·모델을 고르고 [저장]. 기존 페이지의 `err`/`guard()`/`ErrorBanner` 패턴과 `section`/`section__row` 클래스, `Button` 프리미티브를 그대로 재사용한다 — 인라인 `style`은 쓰지 않는다:
 
 ```tsx
 // SettingsPage 컴포넌트 안에 추가:
@@ -110,18 +134,25 @@ useEffect(() => {
     if (s.default_cli) { setDefCli(s.default_cli); setDefModel(s[`default_model_${s.default_cli}`] ?? ''); }
   });
 }, []);
-const saveDefaults = async () => {
-  await api('/settings', { method: 'PUT', body: JSON.stringify({ default_cli: defCli, [`default_model_${defCli}`]: defModel }) });
-  setSavedMsg('저장됨 ✓'); setTimeout(() => setSavedMsg(''), 2000);
-};
+const saveDefaults = () =>
+  guard(async () => {
+    await api('/settings', { method: 'PUT', body: JSON.stringify({ default_cli: defCli, [`default_model_${defCli}`]: defModel }) });
+    setSavedMsg('저장됨 ✓');
+    setTimeout(() => setSavedMsg(''), 2000);
+  });
 
-// JSX (return 최상단에 추가):
-<h2>기본 CLI·모델</h2>
-<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-  <CliPicker cli={defCli} model={defModel} onChange={(c, m) => { setDefCli(c); setDefModel(m); }} />
-  <button onClick={saveDefaults}>저장</button> <span>{savedMsg}</span>
+// JSX (return 최상단, ErrorBanner 다음, "카테고리 관리" 섹션 위에 추가):
+<div className="section">
+  <h2 className="section__title">기본 CLI·모델</h2>
+  <div className="section__row">
+    <CliPicker cli={defCli} model={defModel} onChange={(c, m) => { setDefCli(c); setDefModel(m); }} />
+    <Button variant="primary" onClick={saveDefaults} disabled={!defCli || !defModel}>저장</Button>
+    <span role="status" aria-live="polite">{savedMsg}</span>
+  </div>
 </div>
 ```
+
+저장 피드백은 `role="status" aria-live="polite"`로 스크린리더에도 알린다(DESIGN.md의 비동기 상태 변화 규칙과 일치, `CorrectPage`의 "저장됨 ✓" 패턴과 동일).
 
 (import에 `CliPicker` 추가)
 

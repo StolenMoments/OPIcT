@@ -8,6 +8,7 @@ import { categoriesRoutes } from './routes/categories.js';
 import { questionsRoutes } from './routes/questions.js';
 import { sentencesRoutes } from './routes/sentences.js';
 import { correctionsRoutes } from './routes/corrections.js';
+import { settingsRoutes } from './routes/settings.js';
 import { metaRoutes } from './routes/meta.js';
 
 export async function buildApp({ dbFile = 'data/opict.db', logger = false } = {}) {
@@ -18,6 +19,7 @@ export async function buildApp({ dbFile = 'data/opict.db', logger = false } = {}
   await app.register(questionsRoutes);
   await app.register(sentencesRoutes);
   await app.register(correctionsRoutes);
+  await app.register(settingsRoutes);
   await app.register(metaRoutes);
   app.addHook('onClose', async () => app.repos.close());
 
