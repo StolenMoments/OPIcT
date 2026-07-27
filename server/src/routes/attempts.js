@@ -1,0 +1,49 @@
+import { randomUUID } from 'node:crypto';
+import { createWriteStream } from 'node:fs';
+import { mkdir, unlink } from 'node:fs/promises';
+import { pipeline } from 'node:stream/promises';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { CLIS } from '../ai/clis.js';
+import { enqueue } from '../ai/queue.js';
+import { runAttempt } from '../pipelines/attempt.js';
+
+// process.cwd()에 의존하지 않도록 모듈 위치 기준 절대 경로 사용
+const uploadsDir = fileURLToPath(new URL('../../data/uploads', import.meta.url));
+
+export async function attemptsRoutes(app) {
+  const repos = app.repos;
+
+  app.post('/api/attempts', async (req, reply) => {
+    const parts = req.parts();
+    const fields = {};
+    let audioPath = null;
+    await mkdir(uploadsDir, { recursive: true });
+    for await (const part of parts) {
+      if (part.type === 'file' && part.fieldname === 'audio') {
+        audioPath = join(uploadsDir, `${randomUUID()}.webm`);
+        await pipeline(part.file, createWriteStream(audioPath));
+      } else if (part.type === 'field') {
+        fields[part.fieldname] = part.value;
+      }
+    }
+    const s = repos.settings.getAll();
+    const cli = fields.cli || s.default_cli;
+    const model = fields.model || (CLIS[cli] ? s[`default_model_${cli}`] : undefined);
+    const question = fields.question_id && repos.questions.get(fields.question_id);
+    if (!audioPath || !question || !CLIS[cli] || !model || !CLIS[cli].models.includes(model)) {
+      if (audioPath) await unlink(audioPath).catch(() => {});
+      return reply.code(400).send({ error: 'audio 파일, 유효한 question_id, cli/model(또는 기본값 설정)이 필요합니다' });
+    }
+
+    const row = repos.attempts.create({ question_id: question.id, audio_path: audioPath, cli, model });
+    enqueue(() => runAttempt(repos, row.id));
+    return reply.code(202).send({ id: row.id });
+  });
+
+  app.get('/api/attempts', async () => repos.attempts.list());
+  app.get('/api/attempts/:id', async (req, reply) => {
+    const row = repos.attempts.get(req.params.id);
+    return row ?? reply.code(404).send({ error: 'not found' });
+  });
+}

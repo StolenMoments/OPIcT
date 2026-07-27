@@ -46,7 +46,7 @@ test('attempt pipeline: upload → transcribe → evaluate → done', async (t) 
   form.append('audio', new Blob([Buffer.from('fake-webm')], { type: 'audio/webm' }), 'a.webm');
   form.append('question_id', String(q.id));
   form.append('cli', 'claude');
-  form.append('model', 'claude-fable-5');
+  form.append('model', 'claude-sonnet-5');
   const res = await app.inject({ method: 'POST', url: '/api/attempts', body: form });
   assert.equal(res.statusCode, 202);
 
@@ -55,7 +55,29 @@ test('attempt pipeline: upload → transcribe → evaluate → done', async (t) 
   assert.ok(row.transcript.length > 0);
   assert.ok(JSON.parse(row.result_json));
 });
+
+test('POST /api/attempts rejects invalid question_id without leaving an orphaned upload', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+
+  const form = new FormData();
+  form.append('audio', new Blob([Buffer.from('fake-webm')], { type: 'audio/webm' }), 'a.webm');
+  form.append('question_id', '999999');
+  form.append('cli', 'claude');
+  form.append('model', 'claude-sonnet-5');
+  const res = await app.inject({ method: 'POST', url: '/api/attempts', body: form });
+  assert.equal(res.statusCode, 400);
+});
+
+test('GET /api/attempts/:id 404 for missing id', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const res = await app.inject({ url: '/api/attempts/999999' });
+  assert.equal(res.statusCode, 404);
+});
 ```
+
+> 참고(컨트롤러 결정): 브리프 초안의 `claude-fable-5`는 실제 CLI 모델 allowlist(`server/src/ai/clis.js`)에 없는 모델 id라 `claude-sonnet-5`로 교체. 또한 400 경로에서 업로드 파일이 남지 않는지, 존재하지 않는 id에 404를 반환하는지 검증하는 테스트 2개를 추가했다.
 
 > 참고: `app.inject`는 undici `FormData`/`Blob`(Node 22 내장)을 multipart body로 지원한다.
 
@@ -73,6 +95,7 @@ process.stdin.on('end', () => {
   console.log(JSON.stringify({
     corrected: 'I have been jogging every morning for two years.',
     alternatives: [{ text: 'Jogging has been part of my morning routine.', note_ko: '경험 강조' }],
+    // (기존 correction 키에 이어 attempts 평가 키를 함께 출력하는 겸용 stub — 아래 참고)
     explanation_ko: '현재완료진행형이 자연스럽습니다.',
     summary_ko: '과제를 충실히 수행했습니다.',
     strengths_ko: ['일관된 시제'],
@@ -175,8 +198,18 @@ export async function runAttempt(repos, id) {
     repos.attempts.setStatus(id, { status: 'evaluating', transcript });
 
     const question = repos.questions.get(row.question_id);
-    const raw = await runCli({ cli: row.cli, model: row.model, prompt: buildEvalPrompt(question.text, transcript) })
-      .catch((e) => { throw new Error(`CLI 실행 실패: ${e.message}`); });
+    let raw;
+    try {
+      raw = await runCli({ cli: row.cli, model: row.model, prompt: buildEvalPrompt(question.text, transcript) });
+    } catch (e) {
+      // runCli는 비정상 종료·타임아웃 시에도 e.rawOutput에 그때까지의 stdout을 담아 보존한다.
+      repos.attempts.setStatus(id, {
+        status: 'error',
+        raw_output: e.rawOutput || null,
+        error_message: `CLI 실행 실패: ${e.message}`,
+      });
+      return;
+    }
     const parsed = lenientJson(raw);
     if (!parsed) {
       repos.attempts.setStatus(id, { status: 'error', raw_output: raw, error_message: 'JSON 파싱 실패 — 원문 보기를 확인하세요' });
@@ -189,17 +222,23 @@ export async function runAttempt(repos, id) {
 }
 ```
 
+> 참고(컨트롤러 결정): 브리프 초안은 CLI 실패를 `.catch`에서 즉시 `throw`해 바깥 catch로 넘겼는데, 그 경로에서는 `error_message`만 남고 `e.rawOutput`(실패 전까지의 stdout)이 유실된다. `server/src/pipelines/correction.js`와 동일하게 CLI 호출을 별도 try/catch로 감싸 `raw_output: e.rawOutput || null`을 보존하도록 수정.
+
 `server/src/routes/attempts.js`:
 
 ```js
 import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, unlink } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CLIS } from '../ai/clis.js';
 import { enqueue } from '../ai/queue.js';
 import { runAttempt } from '../pipelines/attempt.js';
+
+// process.cwd()에 의존하지 않도록 모듈 위치 기준 절대 경로 사용
+const uploadsDir = fileURLToPath(new URL('../../data/uploads', import.meta.url));
 
 export async function attemptsRoutes(app) {
   const repos = app.repos;
@@ -208,10 +247,10 @@ export async function attemptsRoutes(app) {
     const parts = req.parts();
     const fields = {};
     let audioPath = null;
-    await mkdir('data/uploads', { recursive: true });
+    await mkdir(uploadsDir, { recursive: true });
     for await (const part of parts) {
       if (part.type === 'file' && part.fieldname === 'audio') {
-        audioPath = join('data/uploads', `${randomUUID()}.webm`);
+        audioPath = join(uploadsDir, `${randomUUID()}.webm`);
         await pipeline(part.file, createWriteStream(audioPath));
       } else if (part.type === 'field') {
         fields[part.fieldname] = part.value;
@@ -219,10 +258,12 @@ export async function attemptsRoutes(app) {
     }
     const s = repos.settings.getAll();
     const cli = fields.cli || s.default_cli;
-    const model = fields.model || s[`default_model_${cli}`];
+    const model = fields.model || (CLIS[cli] ? s[`default_model_${cli}`] : undefined);
     const question = fields.question_id && repos.questions.get(fields.question_id);
-    if (!audioPath || !question || !CLIS[cli] || !model)
+    if (!audioPath || !question || !CLIS[cli] || !model || !CLIS[cli].models.includes(model)) {
+      if (audioPath) await unlink(audioPath).catch(() => {});
       return reply.code(400).send({ error: 'audio 파일, 유효한 question_id, cli/model(또는 기본값 설정)이 필요합니다' });
+    }
 
     const row = repos.attempts.create({ question_id: question.id, audio_path: audioPath, cli, model });
     enqueue(() => runAttempt(repos, row.id));
@@ -236,6 +277,8 @@ export async function attemptsRoutes(app) {
   });
 }
 ```
+
+> 참고(컨트롤러 결정 2, 3): 브리프 초안의 `data/uploads`는 `process.cwd()` 상대 경로라 서버를 어디서 기동하느냐에 따라 위치가 달라진다. `import.meta.url` 기준 절대 경로(`server/data/uploads`)로 고정. 또한 초안은 `question_id`/`cli`/`model` 검증 전에 파일을 먼저 디스크에 쓰므로, 400 응답 경로에서 방금 쓴 파일을 `unlink`로 정리하도록 추가. `server/src/routes/corrections.js`와 동일하게 `CLIS[cli].models.includes(model)`로 모델 allowlist도 검증(정의되지 않은 `cli`에 대한 가드 포함).
 
 `server/src/app.js`에 multipart 등록(정적 서빙 등록보다 위):
 

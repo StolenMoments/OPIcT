@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
+import fastifyMultipart from '@fastify/multipart';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createDb } from './db.js';
@@ -10,17 +11,20 @@ import { sentencesRoutes } from './routes/sentences.js';
 import { correctionsRoutes } from './routes/corrections.js';
 import { settingsRoutes } from './routes/settings.js';
 import { metaRoutes } from './routes/meta.js';
+import { attemptsRoutes } from './routes/attempts.js';
 
 export async function buildApp({ dbFile = 'data/opict.db', logger = false } = {}) {
   const app = Fastify({ logger });
   app.decorate('repos', createRepos(createDb(dbFile)));
   app.get('/api/health', async () => ({ ok: true }));
+  await app.register(fastifyMultipart, { limits: { fileSize: 50 * 1024 * 1024 } });
   await app.register(categoriesRoutes);
   await app.register(questionsRoutes);
   await app.register(sentencesRoutes);
   await app.register(correctionsRoutes);
   await app.register(settingsRoutes);
   await app.register(metaRoutes);
+  await app.register(attemptsRoutes);
   app.addHook('onClose', async () => app.repos.close());
 
   const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));

@@ -9,3 +9,16 @@ export function buildCorrectionPrompt(inputText) {
     `Sentence: ${inputText}`,
   ].join('\n');
 }
+
+export function buildEvalPrompt(questionText, transcript) {
+  return [
+    'You are an OPIc rater coaching a Korean test taker.',
+    'Evaluate the transcribed answer against the question: task fulfillment, organization, vocabulary and grammar.',
+    'Respond with ONLY a JSON object, no prose, matching exactly:',
+    '{"summary_ko": string, "strengths_ko": [string], "improvements_ko": [string], "recommended_expressions": [{"text": string, "note_ko": string}]}',
+    'All *_ko fields must be written in Korean.',
+    '',
+    `Question: ${questionText}`,
+    `Transcribed answer: ${transcript}`,
+  ].join('\n');
+}
