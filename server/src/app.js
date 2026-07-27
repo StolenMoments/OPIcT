@@ -12,6 +12,7 @@ import { correctionsRoutes } from './routes/corrections.js';
 import { settingsRoutes } from './routes/settings.js';
 import { metaRoutes } from './routes/meta.js';
 import { attemptsRoutes } from './routes/attempts.js';
+import { retryRoutes } from './routes/retry.js';
 
 export async function buildApp({ dbFile = 'data/opict.db', logger = false } = {}) {
   const app = Fastify({ logger });
@@ -25,6 +26,7 @@ export async function buildApp({ dbFile = 'data/opict.db', logger = false } = {}
   await app.register(settingsRoutes);
   await app.register(metaRoutes);
   await app.register(attemptsRoutes);
+  await app.register(retryRoutes);
   app.addHook('onClose', async () => app.repos.close());
 
   const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));

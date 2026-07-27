@@ -1,10 +1,299 @@
+import { useCallback, useState } from 'react';
+import { api } from '../api';
+import AttemptResult from '../components/AttemptResult';
+import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
+import ErrorBanner from '../components/ui/ErrorBanner';
+import Skeleton from '../components/ui/Skeleton';
+import StatusPill from '../components/ui/StatusPill';
+import { usePolling } from '../hooks/usePolling';
+import type { Attempt, Correction, CorrectionResult } from '../types';
+import './HistoryPage.css';
+
+function safeParseCorrection(json: string | null): CorrectionResult | null {
+  if (!json) return null;
+  try {
+    const parsed = JSON.parse(json) as Partial<CorrectionResult>;
+    if (
+      typeof parsed.corrected !== 'string' ||
+      !Array.isArray(parsed.alternatives) ||
+      typeof parsed.explanation_ko !== 'string'
+    ) {
+      return null;
+    }
+    return parsed as CorrectionResult;
+  } catch {
+    return null;
+  }
+}
+
+function statusKind(status: string): 'pending' | 'running' | 'done' | 'error' {
+  if (status === 'done' || status === 'error') return status;
+  if (status === 'uploaded' || status === 'pending') return 'pending';
+  return 'running';
+}
+
+function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    uploaded: '대기 중',
+    pending: '대기 중',
+    transcribing: '전사 중',
+    evaluating: '평가 중',
+    running: '처리 중',
+    done: '완료',
+    error: '오류',
+  };
+  return labels[status] ?? status;
+}
+
+function isAttempt(row: Attempt | Correction): row is Attempt {
+  return 'question_text' in row;
+}
+
+function CorrectionDetail({ row }: { row: Correction }) {
+  if (row.status === 'error') {
+    return (
+      <div className="history-detail__content" aria-live="polite">
+        <ErrorBanner message={row.error_message ?? '교정 중 오류가 발생했습니다.'} />
+        {row.raw_output && (
+          <details className="raw-output">
+            <summary>원문 보기</summary>
+            <pre>{row.raw_output}</pre>
+          </details>
+        )}
+      </div>
+    );
+  }
+
+  if (row.status !== 'done') {
+    return (
+      <div className="history-detail__status" aria-live="polite">
+        <StatusPill status={statusKind(row.status)} />
+        <span>{statusLabel(row.status)}…</span>
+      </div>
+    );
+  }
+
+  const result = safeParseCorrection(row.result_json);
+  if (!result) {
+    return (
+      <div className="history-detail__content" aria-live="polite">
+        <ErrorBanner message="교정 결과를 표시할 수 없습니다." />
+        {row.raw_output && (
+          <details className="raw-output">
+            <summary>원문 보기</summary>
+            <pre>{row.raw_output}</pre>
+          </details>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="history-detail__content" aria-live="polite">
+      <div>
+        <h3>교정문</h3>
+        <p className="history-detail__corrected">{result.corrected}</p>
+      </div>
+      <div>
+        <h3>대안 표현</h3>
+        <ul className="row-list">
+          {result.alternatives.map((alternative, index) => (
+            <li key={index} className="row-list__item">
+              <div className="row-list__main">
+                <span className="row-list__text">{alternative.text}</span>
+                <span className="row-list__meta">{alternative.note_ko}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div>
+        <h3>설명</h3>
+        <p>{result.explanation_ko}</p>
+      </div>
+    </div>
+  );
+}
+
+function HistoryRow({
+  row,
+  open,
+  retrying,
+  onToggle,
+  onRetry,
+}: {
+  row: Attempt | Correction;
+  open: boolean;
+  retrying: boolean;
+  onToggle: () => void;
+  onRetry: () => void;
+}) {
+  const attempt = isAttempt(row);
+  const title = attempt ? row.question_text ?? '문항' : row.input_text;
+  const meta = `${row.cli} / ${row.model} · ${row.created_at}`;
+  const detailId = `history-detail-${row.id}`;
+
+  return (
+    <li className="history-entry">
+      <button
+        type="button"
+        className="history-entry__toggle"
+        aria-expanded={open}
+        aria-controls={detailId}
+        onClick={onToggle}
+      >
+        <span className="history-entry__main">
+          <span className="history-entry__title">{title}</span>
+          <span className="history-entry__meta">{meta}</span>
+        </span>
+        <StatusPill status={statusKind(row.status)} />
+        <span className="history-entry__chevron" aria-hidden="true">{open ? '−' : '+'}</span>
+      </button>
+
+      {open && (
+        <div id={detailId} className="history-entry__detail">
+          {attempt && (
+            <audio
+              className="history-entry__audio"
+              controls
+              preload="none"
+              src={`/api/attempts/${row.id}/audio`}
+              aria-label="평가 녹음 다시 듣기"
+            />
+          )}
+          {attempt ? <AttemptResult row={row} /> : <CorrectionDetail row={row} />}
+          <div className="history-entry__actions">
+            <Button variant="primary" size="sm" onClick={onRetry} loading={retrying}>
+              다시 시도
+            </Button>
+          </div>
+        </div>
+      )}
+    </li>
+  );
+}
 
 export default function HistoryPage() {
+  const [kind, setKind] = useState<'attempts' | 'corrections'>('attempts');
+  const [openId, setOpenId] = useState<number | null>(null);
+  const [retryingId, setRetryingId] = useState<number | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const [attemptsError, setAttemptsError] = useState<string | null>(null);
+  const [correctionsError, setCorrectionsError] = useState<string | null>(null);
+
+  const fetchAttempts = useCallback(async () => {
+    try {
+      const rows = await api<Attempt[]>('/attempts');
+      setAttemptsError(null);
+      return rows;
+    } catch (error) {
+      setAttemptsError(error instanceof Error ? error.message : '평가 기록을 불러오지 못했습니다.');
+      throw error;
+    }
+  }, []);
+
+  const fetchCorrections = useCallback(async () => {
+    try {
+      const rows = await api<Correction[]>('/corrections');
+      setCorrectionsError(null);
+      return rows;
+    } catch (error) {
+      setCorrectionsError(error instanceof Error ? error.message : '교정 기록을 불러오지 못했습니다.');
+      throw error;
+    }
+  }, []);
+
+  const attempts = usePolling<Attempt[]>(fetchAttempts, kind === 'attempts');
+  const corrections = usePolling<Correction[]>(fetchCorrections, kind === 'corrections');
+  const rows = kind === 'attempts' ? attempts : corrections;
+  const loadError = kind === 'attempts' ? attemptsError : correctionsError;
+
+  const selectKind = (nextKind: 'attempts' | 'corrections') => {
+    setKind(nextKind);
+    setOpenId(null);
+    setRetryingId(null);
+    setRetryError(null);
+  };
+
+  const retry = async (path: string, id: number) => {
+    setRetryingId(id);
+    setRetryError(null);
+    try {
+      await api(path, { method: 'POST' });
+    } catch (error) {
+      setRetryError(error instanceof Error ? error.message : '다시 시도하지 못했습니다.');
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
   return (
-    <div className="page">
-      <h2>기록</h2>
-      <EmptyState message="기록 화면은 다음 작업에서 구현됩니다." />
+    <div className="page history-page">
+      <div className="history-page__heading">
+        <h2>기록</h2>
+        <p className="muted">완료된 결과를 다시 확인하고, 필요하면 같은 요청을 다시 실행할 수 있습니다.</p>
+      </div>
+
+      <div className="history-tabs" role="tablist" aria-label="기록 종류">
+        <Button
+          role="tab"
+          aria-selected={kind === 'attempts'}
+          aria-controls="history-list"
+          variant={kind === 'attempts' ? 'primary' : 'default'}
+          size="sm"
+          onClick={() => selectKind('attempts')}
+        >
+          평가
+        </Button>
+        <Button
+          role="tab"
+          aria-selected={kind === 'corrections'}
+          aria-controls="history-list"
+          variant={kind === 'corrections' ? 'primary' : 'default'}
+          size="sm"
+          onClick={() => selectKind('corrections')}
+        >
+          교정
+        </Button>
+      </div>
+
+      {loadError && <ErrorBanner message={loadError} />}
+      {retryError && <ErrorBanner message={retryError} onDismiss={() => setRetryError(null)} />}
+
+      <section id="history-list" className="history-page__list" aria-label={kind === 'attempts' ? '평가 기록 목록' : '교정 기록 목록'}>
+        {rows === null && <Skeleton rows={3} />}
+        {rows !== null && rows.length === 0 && (
+          <EmptyState
+            message={kind === 'attempts'
+              ? '연습 탭에서 답변을 녹음하면 평가 기록이 여기에 남습니다.'
+              : '교정 탭에서 영어 문장을 제출하면 교정 기록이 여기에 남습니다.'}
+            action={
+              <Button
+                size="sm"
+                variant="default"
+                onClick={() => selectKind(kind === 'attempts' ? 'corrections' : 'attempts')}
+              >
+                {kind === 'attempts' ? '교정 기록 보기' : '평가 기록 보기'}
+              </Button>
+            }
+          />
+        )}
+        {rows !== null && rows.length > 0 && (
+          <ul className="row-list history-list">
+            {rows.map((row) => (
+              <HistoryRow
+                key={row.id}
+                row={row}
+                open={openId === row.id}
+                retrying={retryingId === row.id}
+                onToggle={() => setOpenId(openId === row.id ? null : row.id)}
+                onRetry={() => retry(kind === 'attempts' ? `/attempts/${row.id}/retry` : `/corrections/${row.id}/retry`, row.id)}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

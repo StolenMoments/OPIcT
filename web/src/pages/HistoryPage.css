@@ -1,0 +1,132 @@
+.history-page__heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.history-page__heading h2 {
+  font-size: var(--t-xl);
+}
+
+.history-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.history-page__list {
+  min-width: 0;
+}
+
+.history-list {
+  border-top: 1px solid var(--line);
+}
+
+.history-entry {
+  display: block;
+  padding: 0;
+}
+
+.history-entry__toggle {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 64px;
+  gap: var(--s-3);
+  padding: var(--s-3) 0;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  overflow: hidden;
+  transition: background-color var(--dur-fast) var(--ease-out-expo);
+}
+
+.history-entry__toggle:hover {
+  background: var(--surface);
+}
+
+.history-entry__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.history-entry__title {
+  overflow-wrap: anywhere;
+}
+
+.history-entry__meta {
+  color: var(--ink-faint);
+  font-size: var(--t-xs);
+  overflow-wrap: anywhere;
+}
+
+.history-entry__chevron {
+  width: 24px;
+  flex-shrink: 0;
+  color: var(--ink-muted);
+  font-size: var(--t-lg);
+  line-height: 1;
+  text-align: center;
+}
+
+.history-entry__detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  min-width: 0;
+  padding: var(--s-4) 0 var(--s-5);
+  border-top: 1px solid var(--line);
+}
+
+.history-entry__audio {
+  display: block;
+  width: min(100%, 30rem);
+  max-width: 100%;
+}
+
+.history-entry__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.history-detail__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  min-width: 0;
+}
+
+.history-detail__content h3 {
+  margin-bottom: var(--s-2);
+  font-size: var(--t-md);
+}
+
+.history-detail__corrected {
+  font-size: var(--t-md);
+  overflow-wrap: anywhere;
+}
+
+.history-detail__status {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--ink-muted);
+}
+
+@media (max-width: 30rem) {
+  .history-entry__toggle {
+    align-items: flex-start;
+  }
+
+  .history-entry__toggle .status-pill {
+    flex-shrink: 0;
+  }
+
+  .history-entry__meta {
+    line-height: 1.4;
+  }
+}
