@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import type { CliMeta } from '../types';
 import './ui/Field.css';
@@ -7,12 +7,26 @@ export default function CliPicker(props: { cli: string; model: string; onChange:
   const [metas, setMetas] = useState<CliMeta[]>([]);
   const [err, setErr] = useState<string | null>(null);
 
+  // `props.cli` can change after mount (e.g. a sibling effect on the parent page
+  // loads a saved default asynchronously). The /meta/clis fetch below and that
+  // sibling effect race with no ordering guarantee, so the auto-select callback
+  // must read the *live* cli value at the moment the response lands, not the
+  // value captured by its mount-time closure — otherwise a default that
+  // resolves first can be silently clobbered by the "pick the first CLI"
+  // fallback. A ref mirrors the prop on every render for exactly that purpose.
+  const cliRef = useRef(props.cli);
+  cliRef.current = props.cli;
+  const autoSelectedRef = useRef(false);
+
   useEffect(() => {
     api<CliMeta[]>('/meta/clis')
       .then((m) => {
         setMetas(m);
         setErr(null);
-        if (!props.cli && m.length) props.onChange(m[0].name, m[0].models[0]);
+        if (!autoSelectedRef.current && !cliRef.current && m.length) {
+          autoSelectedRef.current = true;
+          props.onChange(m[0].name, m[0].models[0]);
+        }
       })
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps

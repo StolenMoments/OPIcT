@@ -45,3 +45,18 @@ test('PUT /api/settings passes through unrelated keys unvalidated', async (t) =>
   assert.equal(res.statusCode, 200);
   assert.equal(res.json().whisper_model, 'tiny.en');
 });
+
+test('PUT /api/settings rejects non-string/nested default_cli', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const res = await app.inject({ method: 'PUT', url: '/api/settings', payload: { default_cli: { nested: true } } });
+  assert.equal(res.statusCode, 400);
+});
+
+test('correction: default_cli set but its default_model_<cli> missing rejected with 400', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  await app.inject({ method: 'PUT', url: '/api/settings', payload: { default_cli: 'claude' } });
+  const res = await app.inject({ method: 'POST', url: '/api/corrections', payload: { input_text: 'hello' } });
+  assert.equal(res.statusCode, 400);
+});

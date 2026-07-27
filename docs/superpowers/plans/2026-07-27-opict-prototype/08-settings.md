@@ -2,7 +2,7 @@
 
 **Files:**
 - Create: `server/src/repo/settings.js`, `server/src/routes/settings.js`, `server/test/settings.test.js`
-- Modify: `server/src/repo/index.js`, `server/src/app.js`, `server/src/routes/corrections.js`, `web/src/pages/SettingsPage.tsx`, `web/src/pages/CorrectPage.tsx`
+- Modify: `server/src/repo/index.js`, `server/src/app.js`, `server/src/routes/corrections.js`, `web/src/pages/SettingsPage.tsx`, `web/src/pages/CorrectPage.tsx`, `web/src/components/CliPicker.tsx`
 
 **Interfaces:**
 - Consumes: `app.repos`(01), CliPicker(07)
@@ -166,7 +166,36 @@ useEffect(() => {
 }, []);
 ```
 
-(CliPicker는 `props.cli`가 이미 있으면 첫 CLI로 덮어쓰지 않으므로 그대로 동작)
+**주의(레이스):** 이 `/settings` fetch와 `CliPicker` 내부의 `/meta/clis` fetch는 순서 보장 없이 동시에 진행된다. 최초 구현은 `CliPicker`가 `props.cli`가 이미 있으면 첫 CLI로 덮어쓰지 않는다고 가정했지만, 그 체크가 mount 시점 클로저에 갇힌 `props.cli`(항상 빈 문자열)를 읽고 있어서 `/settings`가 먼저 응답해 기본값을 세팅해도 `/meta/clis`가 나중에 응답하면 "첫 CLI" 폴백이 저장된 기본값을 조용히 덮어쓰는 결함이 있었다(리뷰에서 발견, 수정 완료).
+
+**수정된 동작** — `web/src/components/CliPicker.tsx`: `props.cli`를 매 렌더마다 미러링하는 ref(`cliRef`)를 두고, `/meta/clis` 응답이 도착한 "그 순간"의 최신 값을 그 ref로 읽는다. 자동 선택은 `autoSelectedRef`로 최대 한 번만 실행된다. 두 fetch 중 어느 쪽이 먼저 끝나든, 저장된 기본값이 있으면 항상 "첫 CLI" 폴백을 이긴다 — `/settings`가 먼저 응답하면 `cliRef.current`가 이미 채워져 있어 자동 선택이 스킵되고, `/meta/clis`가 먼저 응답해 자동 선택이 실행되더라도 뒤이어 `/settings`가 응답하면 부모의 `setCli`/`setDefCli`가 그 값을 덮어쓴다. `CliPicker`의 export 시그니처(`{ cli, model, onChange }`)는 변경하지 않았다(10번 태스크 의존).
+
+```tsx
+export default function CliPicker(props: { cli: string; model: string; onChange: (cli: string, model: string) => void }) {
+  const [metas, setMetas] = useState<CliMeta[]>([]);
+  const [err, setErr] = useState<string | null>(null);
+
+  // props.cli 미러링 ref — /meta/clis 응답이 도착한 순간의 최신 값을 읽기 위함
+  const cliRef = useRef(props.cli);
+  cliRef.current = props.cli;
+  const autoSelectedRef = useRef(false);
+
+  useEffect(() => {
+    api<CliMeta[]>('/meta/clis')
+      .then((m) => {
+        setMetas(m);
+        setErr(null);
+        if (!autoSelectedRef.current && !cliRef.current && m.length) {
+          autoSelectedRef.current = true;
+          props.onChange(m[0].name, m[0].models[0]);
+        }
+      })
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // ...select 렌더링은 이전과 동일
+}
+```
 
 - [ ] **Step 7: 빌드·커밋**
 
