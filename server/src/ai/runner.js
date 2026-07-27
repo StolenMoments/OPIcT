@@ -52,6 +52,11 @@ export function runCli({ cli, model, prompt, timeoutMs = 180_000 }) {
     const settleReject = (e) => { if (!settled) { settled = true; clearTimeout(timer); reject(e); } };
     const timer = setTimeout(() => {
       child.kill();
+      // SIGTERM을 무시하는 프로세스 대응 — 잠시 기다렸다가 강제 종료한다.
+      const killTimer = setTimeout(() => {
+        if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+      }, 5000);
+      killTimer.unref?.();
       const e = new Error(`CLI 타임아웃 (${timeoutMs / 1000}초)`);
       e.rawOutput = out;
       settleReject(e);

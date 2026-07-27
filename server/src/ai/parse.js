@@ -9,7 +9,7 @@ export function lenientJson(text) {
   for (const c of candidates) {
     try {
       const v = JSON.parse(c.trim());
-      if (v && typeof v === 'object') return v;
+      if (v && typeof v === 'object' && !Array.isArray(v)) return v;
     } catch { /* 다음 후보 */ }
   }
   return null;

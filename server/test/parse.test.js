@@ -14,3 +14,6 @@ test('json with surrounding prose', () => {
 test('no json returns null', () => {
   assert.equal(lenientJson('no json here'), null);
 });
+test('bare json array is rejected, not treated as a successful parse', () => {
+  assert.equal(lenientJson('[1,2,3]'), null);
+});

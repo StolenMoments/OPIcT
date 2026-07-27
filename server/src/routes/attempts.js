@@ -19,13 +19,22 @@ export async function attemptsRoutes(app) {
     const fields = {};
     let audioPath = null;
     await mkdir(uploadsDir, { recursive: true });
+    let truncated = false;
     for await (const part of parts) {
       if (part.type === 'file' && part.fieldname === 'audio') {
         audioPath = join(uploadsDir, `${randomUUID()}.webm`);
         await pipeline(part.file, createWriteStream(audioPath));
+        if (part.file.truncated) truncated = true;
+      } else if (part.type === 'file') {
+        // 예상치 못한 필드의 파일 파트 — 소비하지 않으면 busboy 이터레이터가 멈춘다.
+        part.file.resume();
       } else if (part.type === 'field') {
         fields[part.fieldname] = part.value;
       }
+    }
+    if (truncated) {
+      if (audioPath) await unlink(audioPath).catch(() => {});
+      return reply.code(400).send({ error: '업로드 파일이 허용 크기를 초과했습니다' });
     }
     const s = repos.settings.getAll();
     const cli = fields.cli || s.default_cli;

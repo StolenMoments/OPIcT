@@ -14,8 +14,11 @@ export async function sentencesRoutes(app) {
   app.put('/api/sentences/:id', async (req, reply) => {
     const row = repo.get(req.params.id);
     if (!row) return reply.code(404).send({ error: 'not found' });
-    const { text_en = row.text_en, memo = row.memo } = req.body ?? {};
-    return repo.update(row.id, { text_en, memo });
+    const body = req.body ?? {};
+    const { text_en = row.text_en, memo = row.memo } = body;
+    if (body.text_en !== undefined && !text_en?.trim())
+      return reply.code(400).send({ error: 'text_en은 빈 값일 수 없습니다' });
+    return repo.update(row.id, { text_en: text_en.trim(), memo });
   });
 
   app.delete('/api/sentences/:id', async (req, reply) => {
