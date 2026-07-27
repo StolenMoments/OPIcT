@@ -75,5 +75,31 @@ test('retry and audio routes return 404 for missing records', async (t) => {
   for (const url of ['/api/attempts/999/retry', '/api/corrections/999/retry', '/api/attempts/999/audio']) {
     const response = await app.inject({ method: url.endsWith('/retry') ? 'POST' : 'GET', url });
     assert.equal(response.statusCode, 404, url);
+    assert.deepEqual(response.json(), { error: 'not found' }, url);
   }
+});
+
+test('audio route returns exact 404 body when an existing attempt file is missing', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const category = (await app.inject({ method: 'POST', url: '/api/categories', payload: { type: 'survey', name: '여행' } })).json();
+  const question = (await app.inject({ method: 'POST', url: '/api/questions',
+    payload: { category_id: category.id, text: 'Tell me about your last trip.' } })).json();
+
+  const form = new FormData();
+  form.append('audio', new Blob([Buffer.from('fake-webm')], { type: 'audio/webm' }), 'answer.webm');
+  form.append('question_id', String(question.id));
+  form.append('cli', 'claude');
+  form.append('model', 'claude-haiku-4-5-20251001');
+  const created = await app.inject({ method: 'POST', url: '/api/attempts', body: form });
+  assert.equal(created.statusCode, 202);
+
+  const completed = await waitDone(app, `/api/attempts/${created.json().id}`);
+  assert.equal(completed.status, 'done');
+  await unlink(completed.audio_path);
+  assert.equal(existsSync(completed.audio_path), false);
+
+  const response = await app.inject({ url: `/api/attempts/${completed.id}/audio` });
+  assert.equal(response.statusCode, 404);
+  assert.deepEqual(response.json(), { error: 'not found' });
 });

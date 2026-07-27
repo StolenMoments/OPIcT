@@ -85,3 +85,17 @@
 - 서버 테스트는 실제 Claude/Whisper 실행이 아니라 기존 stub CLI/STT를 사용한다. 운영 CLI 환경에서 error 상태를 복구하는 수동 검증은 별도로 필요하다.
 - retry 테스트에서 사용한 모델명은 brief 예시와 다르며, 현재 저장소의 allowlist 계약을 따르기 위한 의도적인 보정이다. 새로운 모델은 추가하지 않았다.
 - `git remote -v` 결과가 비어 있어 원격 push는 수행하지 못했다. 구현은 로컬 `master` 커밋으로 남겼다.
+
+## 리뷰 후속 수정
+
+리뷰어의 Important 지적에 따라 `server/test/retry.test.js`를 보강했다.
+
+- 없는 attempt/correction retry와 없는 audio 레코드의 응답 body가 정확히 `{ error: 'not found' }`인지 `assert.deepEqual`로 검증한다.
+- 정상적으로 생성·처리된 기존 attempt의 `audio_path` 파일을 삭제한 뒤 audio endpoint를 호출해, 레코드는 존재하지만 파일이 없는 경우에도 정확한 404 body를 검증한다.
+- 서버 라우트와 런타임 동작은 변경하지 않았다.
+- 리뷰어가 deferred한 중간 reset 상태 검증은 추가하지 않았다.
+
+검증 명령과 결과:
+
+- `cd server && node --test test/retry.test.js` — 4개 통과, 0개 실패
+- `cd server && npm test` — 46개 통과, 0개 실패
