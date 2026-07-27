@@ -8,7 +8,7 @@
 
 | 항목 | 결정 |
 |---|---|
-| 서버 스택 | Node.js + Fastify 단일 서버, SQLite(better-sqlite3) |
+| 서버 스택 | Node.js + Fastify 단일 서버, SQLite(better-sqlite3). **단, 추후 MariaDB 전환 대비 리포지토리 패턴 — SQL·드라이버는 `repo/` 계층에만 존재, 라우트·파이프라인은 repo 인터페이스만 사용** |
 | 프론트 | Vite + React + TypeScript, PWA(매니페스트 + 정적 자산 캐시 서비스워커) |
 | STT | 서버 로컬 whisper.cpp 바이너리(subprocess). ffmpeg으로 16kHz WAV 변환 후 실행 |
 | AI 평가/교정 | 서버 설치 CLI 3종을 비대화형 subprocess로 호출: Claude Code(`claude -p`), Codex CLI(`codex exec`), Antigravity CLI(`agy -p`) |
