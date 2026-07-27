@@ -48,7 +48,8 @@ export default function CliPicker(props: { cli: string; model: string; onChange:
     api<CliMeta[]>('/meta/clis').then((m) => {
       setMetas(m);
       if (!props.cli && m.length) props.onChange(m[0].name, m[0].models[0]);
-    });
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const current = metas.find((m) => m.name === props.cli);
   return (
@@ -71,55 +72,98 @@ export default function CliPicker(props: { cli: string; model: string; onChange:
 
 동작: 문장 입력 → [교정 요청] → `POST /corrections`(202, id) → usePolling으로 `GET /corrections/:id` → done이면 결과 렌더, error면 `error_message` + raw_output "원문 보기" `<details>`. 결과의 corrected·각 alternative 옆 [노트에 저장] → CategoryPicker로 카테고리 고르고 `POST /sentences` (`source:'correction'`).
 
+`err` 상태 + `guard()` 헬퍼(SettingsPage 패턴)로 `submit`의 `api()` 실패를 화면에 표시하고, `SaveToNote`도 저장 실패를 자체적으로 표시한다. `result_json` 파싱은 `safeParseResult`로 감싸 malformed JSON이 렌더를 깨뜨리지 않게 하고, 파싱 실패 시 raw_output "원문 보기" 폴백을 보여준다. 폴링은 `status`를 별도 state로 미러링해 `active = jobId != null && status가 done/error가 아님`으로 계산, job이 끝나면 정지하고 마지막으로 받은 row는 계속 렌더된다.
+
 ```tsx
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { api } from '../api';
 import CliPicker from '../components/CliPicker';
 import CategoryPicker from '../components/CategoryPicker';
 import { usePolling } from '../hooks/usePolling';
 import type { Correction, CorrectionResult } from '../types';
 
+function safeParseResult(json: string | null): CorrectionResult | null {
+  if (!json) return null;
+  try {
+    return JSON.parse(json) as CorrectionResult;
+  } catch {
+    return null;
+  }
+}
+
 function SaveToNote({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
   const [catId, setCatId] = useState<number | null>(null);
   const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const save = async () => {
+    try {
+      await api('/sentences', {
+        method: 'POST',
+        body: JSON.stringify({ category_id: catId, text_en: text, source: 'correction' }),
+      });
+      setSaved(true);
+      setErr(null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   if (saved) return <small>저장됨 ✓</small>;
   if (!open) return <button onClick={() => setOpen(true)}>노트에 저장</button>;
   return (
     <span>
       <CategoryPicker value={catId} onChange={setCatId} />
-      <button disabled={!catId} onClick={async () => {
-        await api('/sentences', { method: 'POST', body: JSON.stringify({ category_id: catId, text_en: text, source: 'correction' }) });
-        setSaved(true);
-      }}>저장</button>
+      <button disabled={!catId} onClick={save}>저장</button>
+      {err && <small style={{ color: 'crimson' }}> {err}</small>}
     </span>
   );
 }
 
 export default function CorrectPage() {
+  const [err, setErr] = useState<string | null>(null);
+  const guard = useCallback(async (fn: () => Promise<void>) => {
+    try {
+      await fn();
+      setErr(null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
   const [input, setInput] = useState('');
   const [cli, setCli] = useState('');
   const [model, setModel] = useState('');
   const [jobId, setJobId] = useState<number | null>(null);
+  const [status, setStatus] = useState<string | undefined>(undefined);
+
+  const settled = status === 'done' || status === 'error';
+  const active = jobId != null && !settled;
 
   const row = usePolling<Correction>(
-    () => api(`/corrections/${jobId}`),
-    jobId != null,
+    () => api<Correction>(`/corrections/${jobId}`).then((r) => { setStatus(r.status); return r; }),
+    active,
   );
-  const busy = jobId != null && row?.status !== 'done' && row?.status !== 'error';
-  const result: CorrectionResult | null = row?.status === 'done' && row.result_json ? JSON.parse(row.result_json) : null;
 
-  const submit = async () => {
+  const busy = jobId != null && !settled;
+  const result = row?.status === 'done' ? safeParseResult(row.result_json) : null;
+  const parseFailed = row?.status === 'done' && row.result_json != null && result === null;
+
+  const submit = () => guard(async () => {
+    if (!input.trim()) return;
     const { id } = await api<{ id: number }>('/corrections', {
       method: 'POST',
       body: JSON.stringify({ input_text: input, cli, model }),
     });
+    setStatus(undefined);
     setJobId(id);
-  };
+  });
 
   return (
     <div>
       <h2>문장 교정</h2>
+      {err && <p style={{ color: 'red' }}>{err}</p>}
       <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={3} style={{ width: '100%' }}
         placeholder="교정받을 영어 문장" />
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -131,6 +175,12 @@ export default function CorrectPage() {
         <div style={{ color: 'crimson' }}>
           <p>{row.error_message}</p>
           {row.raw_output && <details><summary>원문 보기</summary><pre>{row.raw_output}</pre></details>}
+        </div>
+      )}
+      {parseFailed && (
+        <div style={{ color: 'crimson' }}>
+          <p>결과를 표시할 수 없습니다.</p>
+          {row?.raw_output && <details><summary>원문 보기</summary><pre>{row.raw_output}</pre></details>}
         </div>
       )}
       {result && (
