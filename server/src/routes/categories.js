@@ -13,8 +13,11 @@ export async function categoriesRoutes(app) {
   app.put('/api/categories/:id', async (req, reply) => {
     const row = repo.get(req.params.id);
     if (!row) return reply.code(404).send({ error: 'not found' });
-    const { name = row.name, sort_order = row.sort_order } = req.body ?? {};
-    return repo.update(row.id, { name, sort_order });
+    const body = req.body ?? {};
+    const { name = row.name, sort_order = row.sort_order } = body;
+    if (body.name !== undefined && !name?.trim())
+      return reply.code(400).send({ error: 'name은 빈 값일 수 없습니다' });
+    return repo.update(row.id, { name: name.trim(), sort_order });
   });
 
   app.delete('/api/categories/:id', async (req, reply) => {

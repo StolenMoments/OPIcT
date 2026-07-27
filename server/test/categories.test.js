@@ -31,3 +31,29 @@ test('invalid type rejected', async (t) => {
   const res = await post(app, '/api/categories', { type: 'wrong', name: 'x' });
   assert.equal(res.statusCode, 400);
 });
+
+test('PUT with blank name rejected, row unchanged', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const cat = (await post(app, '/api/categories', { type: 'survey', name: '국내여행' })).json();
+
+  const res = await app.inject({ method: 'PUT', url: `/api/categories/${cat.id}`, payload: { name: '' } });
+  assert.equal(res.statusCode, 400);
+
+  const blankSpaces = await app.inject({ method: 'PUT', url: `/api/categories/${cat.id}`, payload: { name: '   ' } });
+  assert.equal(blankSpaces.statusCode, 400);
+
+  const stored = await app.inject({ url: `/api/categories?type=survey` });
+  assert.equal(stored.json()[0].name, '국내여행');
+});
+
+test('PUT omitting name preserves existing value', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const cat = (await post(app, '/api/categories', { type: 'survey', name: '국내여행' })).json();
+
+  const res = await app.inject({ method: 'PUT', url: `/api/categories/${cat.id}`, payload: { sort_order: 5 } });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.json().name, '국내여행');
+  assert.equal(res.json().sort_order, 5);
+});
