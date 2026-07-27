@@ -14,7 +14,9 @@ export async function transcribe(audioPath) {
   if (!bin || !model) throw new Error('OPICT_WHISPER_BIN / OPICT_WHISPER_MODEL 환경변수가 필요합니다');
 
   const wav = `${audioPath}.wav`;
-  await run('ffmpeg', ['-y', '-i', audioPath, '-ar', '16000', '-ac', '1', wav]);
+  // 타임아웃 필수 — 이 함수는 서버 전역 직렬 큐 안에서 돌기 때문에,
+  // ffmpeg이 멈추면 이후 모든 교정·평가 요청이 함께 멈춘다.
+  await run('ffmpeg', ['-y', '-i', audioPath, '-ar', '16000', '-ac', '1', wav], { timeout: 180_000 });
   await run(bin, ['-m', model, '-f', wav, '-l', 'en', '-otxt', '-of', wav], { timeout: 180_000 });
   return (await readFile(`${wav}.txt`, 'utf8')).trim();
 }
