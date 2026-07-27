@@ -7,6 +7,8 @@ import { createRepos } from './repo/index.js';
 import { categoriesRoutes } from './routes/categories.js';
 import { questionsRoutes } from './routes/questions.js';
 import { sentencesRoutes } from './routes/sentences.js';
+import { correctionsRoutes } from './routes/corrections.js';
+import { metaRoutes } from './routes/meta.js';
 
 export async function buildApp({ dbFile = 'data/opict.db', logger = false } = {}) {
   const app = Fastify({ logger });
@@ -15,6 +17,8 @@ export async function buildApp({ dbFile = 'data/opict.db', logger = false } = {}
   await app.register(categoriesRoutes);
   await app.register(questionsRoutes);
   await app.register(sentencesRoutes);
+  await app.register(correctionsRoutes);
+  await app.register(metaRoutes);
   app.addHook('onClose', async () => app.repos.close());
 
   const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
