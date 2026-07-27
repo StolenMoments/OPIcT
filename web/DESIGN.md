@@ -8,6 +8,10 @@ Register: **product** (design serves the task). 사용자는 연습 중이고, U
 
 → **다크 우선. 앰버 액센트 하나(녹음 탤리 램프). 나머지는 무채색.**
 
+## PWA 크롬·아이콘 색 결정
+
+PWA 크롬은 기존 다크 우선 앰버 시스템을 따른다. 매니페스트의 `background_color`와 아이콘 바탕은 기존 favicon의 다크 뉴트럴 `#221d19`, `theme_color`와 아이콘의 앰버 표식은 기존 favicon의 `#e2883f`, 아이콘 글자는 밝은 잉크 `#fff8e7`로 고정한다. 이 세 색은 설치 화면과 런처 아이콘에서 같은 브랜드 인상을 유지하기 위한 정적 색상이며, 매니페스트와 PNG 아이콘에서 일관되게 사용한다.
+
 ## 색 (OKLCH, 전략: Restrained)
 
 라이트/다크 두 테마를 모두 정의하되 **다크가 기본**이다. `:root`에 다크 값을 두고 `@media (prefers-color-scheme: light)`에서 라이트로 덮는다.
