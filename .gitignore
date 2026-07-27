@@ -2,6 +2,9 @@
 .env
 .claude
 .codex
+.agents
+.gemini
+.superpowers
 node_modules
 server/data/
 web/dist/
