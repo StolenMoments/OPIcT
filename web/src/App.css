@@ -1,0 +1,117 @@
+.app {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.app__header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  padding: 0 var(--s-4);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.app__brand {
+  font-size: var(--t-lg);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.app__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  font-size: var(--t-xs);
+  color: var(--ink-muted);
+}
+
+.app__status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+
+.app__status-dot--online {
+  background: var(--success);
+}
+
+.app__status-dot--offline {
+  background: var(--danger);
+}
+
+.app__main {
+  flex: 1;
+  width: 100%;
+  padding: var(--s-4);
+  padding-bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom) + var(--s-4));
+}
+
+.app__tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  background: var(--surface-2);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.app__tab {
+  position: relative;
+  flex: 1;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--ink-muted);
+  font-size: var(--t-sm);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out-expo);
+}
+
+.app__tab::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 22%;
+  right: 22%;
+  height: 2px;
+  background: var(--accent);
+  border-radius: var(--r-pill);
+  transform: scaleX(0);
+  transition: transform var(--dur-base) var(--ease-out-expo);
+}
+
+.app__tab--active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.app__tab--active::before {
+  transform: scaleX(1);
+}
+
+.app__tab:hover:not(.app__tab--active) {
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app__tab::before {
+    transition: none;
+  }
+}

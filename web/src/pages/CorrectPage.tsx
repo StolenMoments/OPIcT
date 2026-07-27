@@ -3,7 +3,13 @@ import { api } from '../api';
 import CliPicker from '../components/CliPicker';
 import CategoryPicker from '../components/CategoryPicker';
 import { usePolling } from '../hooks/usePolling';
+import Button from '../components/ui/Button';
+import Field from '../components/ui/Field';
+import StatusPill from '../components/ui/StatusPill';
+import ErrorBanner from '../components/ui/ErrorBanner';
 import type { Correction, CorrectionResult } from '../types';
+import '../components/ui/Field.css';
+import './CorrectPage.css';
 
 function safeParseResult(json: string | null): CorrectionResult | null {
   if (!json) return null;
@@ -33,13 +39,31 @@ function SaveToNote({ text }: { text: string }) {
     }
   };
 
-  if (saved) return <small>저장됨 ✓</small>;
-  if (!open) return <button onClick={() => setOpen(true)}>노트에 저장</button>;
+  if (saved) {
+    return (
+      <span className="save-to-note__done" role="status" aria-live="polite">
+        저장됨 ✓
+      </span>
+    );
+  }
+  if (!open) {
+    return (
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+        노트에 저장
+      </Button>
+    );
+  }
   return (
-    <span>
+    <span className="save-to-note">
       <CategoryPicker value={catId} onChange={setCatId} />
-      <button disabled={!catId} onClick={save}>저장</button>
-      {err && <small style={{ color: 'crimson' }}> {err}</small>}
+      <Button size="sm" variant="primary" disabled={!catId} onClick={save}>
+        저장
+      </Button>
+      {err && (
+        <p className="field__error" role="alert">
+          {err}
+        </p>
+      )}
     </span>
   );
 }
@@ -81,53 +105,94 @@ export default function CorrectPage() {
   const result = row?.status === 'done' ? safeParseResult(row.result_json) : null;
   const parseFailed = row?.status === 'done' && row.result_json != null && result === null;
 
-  const submit = () => guard(async () => {
-    if (!input.trim()) return;
-    const { id } = await api<{ id: number }>('/corrections', {
-      method: 'POST',
-      body: JSON.stringify({ input_text: input, cli, model }),
+  const submit = () =>
+    guard(async () => {
+      if (!input.trim()) return;
+      const { id } = await api<{ id: number }>('/corrections', {
+        method: 'POST',
+        body: JSON.stringify({ input_text: input, cli, model }),
+      });
+      setJobId(id);
+      setActive(true);
     });
-    setJobId(id);
-    setActive(true);
-  });
 
   return (
-    <div>
+    <div className="page">
       <h2>문장 교정</h2>
-      {err && <p style={{ color: 'red' }}>{err}</p>}
-      <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={3} style={{ width: '100%' }}
-        placeholder="교정받을 영어 문장" />
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <CliPicker cli={cli} model={model} onChange={(c, m) => { setCli(c); setModel(m); }} />
-        <button onClick={submit} disabled={busy || !input.trim()}>{busy ? `${row?.status ?? '요청'} 중…` : '교정 요청'}</button>
+
+      {err && <ErrorBanner message={err} onDismiss={() => setErr(null)} />}
+
+      <div className="section">
+        <Field label="교정받을 영어 문장" htmlFor="correct-input">
+          <textarea
+            id="correct-input"
+            className="textarea"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            rows={3}
+            placeholder="예: I go to school yesterday."
+          />
+        </Field>
+
+        <div className="section__row">
+          <CliPicker cli={cli} model={model} onChange={(c, m) => { setCli(c); setModel(m); }} />
+          <Button variant="primary" onClick={submit} disabled={busy || !input.trim()} loading={busy}>
+            {busy ? '요청 처리 중' : '교정 요청'}
+          </Button>
+          {row && <StatusPill status={row.status} />}
+        </div>
       </div>
 
-      {row?.status === 'error' && (
-        <div style={{ color: 'crimson' }}>
-          <p>{row.error_message}</p>
-          {row.raw_output && <details><summary>원문 보기</summary><pre>{row.raw_output}</pre></details>}
-        </div>
-      )}
-      {parseFailed && (
-        <div style={{ color: 'crimson' }}>
-          <p>결과를 표시할 수 없습니다.</p>
-          {row?.raw_output && <details><summary>원문 보기</summary><pre>{row.raw_output}</pre></details>}
-        </div>
-      )}
-      {result && (
-        <div>
-          <h3>교정문</h3>
-          <p>{result.corrected} <SaveToNote text={result.corrected} /></p>
-          <h3>대안 표현</h3>
-          <ul>
-            {result.alternatives.map((a, i) => (
-              <li key={i}>{a.text} — <small>{a.note_ko}</small> <SaveToNote text={a.text} /></li>
-            ))}
-          </ul>
-          <h3>설명</h3>
-          <p>{result.explanation_ko}</p>
-        </div>
-      )}
+      <div aria-live="polite" className="page">
+        {row?.status === 'error' && (
+          <ErrorBanner message={row.error_message ?? '교정 중 오류가 발생했습니다.'} />
+        )}
+        {row?.status === 'error' && row.raw_output && (
+          <details className="raw-output">
+            <summary>원문 보기</summary>
+            <pre>{row.raw_output}</pre>
+          </details>
+        )}
+
+        {parseFailed && <ErrorBanner message="결과를 표시할 수 없습니다." />}
+        {parseFailed && row?.raw_output && (
+          <details className="raw-output">
+            <summary>원문 보기</summary>
+            <pre>{row.raw_output}</pre>
+          </details>
+        )}
+
+        {result && (
+          <div className="section">
+            <div>
+              <h3>교정문</h3>
+              <p className="correct-result__text">
+                {result.corrected} <SaveToNote text={result.corrected} />
+              </p>
+            </div>
+            <div>
+              <h3>대안 표현</h3>
+              <ul className="row-list">
+                {result.alternatives.map((a, i) => (
+                  <li key={i} className="row-list__item">
+                    <div className="row-list__main">
+                      <span className="row-list__text">{a.text}</span>
+                      <span className="row-list__meta">{a.note_ko}</span>
+                    </div>
+                    <div className="row-list__actions">
+                      <SaveToNote text={a.text} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>설명</h3>
+              <p>{result.explanation_ko}</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
