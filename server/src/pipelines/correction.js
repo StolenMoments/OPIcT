@@ -14,6 +14,10 @@ export async function runCorrection(repos, id) {
     }
     repos.corrections.setStatus(id, { status: 'done', result_json: JSON.stringify(parsed), raw_output: raw });
   } catch (e) {
-    repos.corrections.setStatus(id, { status: 'error', error_message: `CLI 실행 실패: ${e.message}` });
+    repos.corrections.setStatus(id, {
+      status: 'error',
+      raw_output: e.rawOutput || null,
+      error_message: `CLI 실행 실패: ${e.message}`,
+    });
   }
 }

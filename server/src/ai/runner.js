@@ -16,18 +16,26 @@ export function runCli({ cli, model, prompt, timeoutMs = 180_000 }) {
 
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { cwd: sandbox, shell: !stub && process.platform === 'win32' });
-    let out = '', err = '';
+    let out = '', err = '', settled = false;
+    const settleResolve = (v) => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } };
+    const settleReject = (e) => { if (!settled) { settled = true; clearTimeout(timer); reject(e); } };
     const timer = setTimeout(() => {
       child.kill();
-      reject(new Error(`CLI 타임아웃 (${timeoutMs / 1000}초)`));
+      const e = new Error(`CLI 타임아웃 (${timeoutMs / 1000}초)`);
+      e.rawOutput = out;
+      settleReject(e);
     }, timeoutMs);
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (err += d));
-    child.on('error', (e) => { clearTimeout(timer); reject(e); });
+    child.on('error', (e) => { e.rawOutput = out; settleReject(e); });
+    child.stdin.on('error', () => { /* EPIPE 등 — close/error 핸들러가 최종 처리 */ });
     child.on('close', (code) => {
-      clearTimeout(timer);
-      if (code !== 0) return reject(new Error(`CLI 종료코드 ${code}: ${err.slice(0, 500)}`));
-      resolve(def.extract(out));
+      if (code !== 0) {
+        const e = new Error(`CLI 종료코드 ${code}: ${err.slice(0, 500)}`);
+        e.rawOutput = out;
+        return settleReject(e);
+      }
+      settleResolve(def.extract(out));
     });
     child.stdin.write(prompt);
     child.stdin.end(); // agy Windows hang 대응 — 반드시 즉시 닫기

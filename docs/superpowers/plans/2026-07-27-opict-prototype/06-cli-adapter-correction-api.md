@@ -1,7 +1,7 @@
 # Task 06: CLI 어댑터·큐·관대한 파싱 + 교정 API
 
 **Files:**
-- Create: `server/src/ai/clis.js`, `server/src/ai/runner.js`, `server/src/ai/parse.js`, `server/src/ai/queue.js`, `server/src/ai/prompts.js`, `server/src/pipelines/correction.js`, `server/src/repo/corrections.js`, `server/src/routes/corrections.js`, `server/src/routes/meta.js`, `server/test/parse.test.js`, `server/test/corrections.test.js`, `server/test/fixtures/stub-cli.js`
+- Create: `server/src/ai/clis.js`, `server/src/ai/runner.js`, `server/src/ai/parse.js`, `server/src/ai/queue.js`, `server/src/ai/prompts.js`, `server/src/pipelines/correction.js`, `server/src/repo/corrections.js`, `server/src/routes/corrections.js`, `server/src/routes/meta.js`, `server/test/parse.test.js`, `server/test/corrections.test.js`, `server/test/fixtures/stub-cli.js`, `server/test/fixtures/stub-cli-bad-json.js`, `server/test/fixtures/stub-cli-fail.js`
 - Modify: `server/src/repo/index.js`, `server/src/app.js`
 
 **Interfaces:**
@@ -73,13 +73,13 @@ export function enqueue(fn) {
 }
 ```
 
-`server/src/ai/clis.js` — 모델 목록은 필요 시 여기만 수정:
+`server/src/ai/clis.js` — 모델 목록은 필요 시 여기만 수정 (각 CLI당 모델 1개, 배열 형태 유지):
 
 ```js
 export const CLIS = {
   claude: {
     label: 'Claude Code',
-    models: ['claude-fable-5', 'claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'],
+    models: ['claude-sonnet-5'],
     argv: (model) => ['claude', '-p', '--model', model, '--output-format', 'json',
       '--disallowedTools', '*', '--no-session'],
     // claude는 {result: "..."} 봉투로 출력 → result만 꺼냄. 실패 시 원문 그대로.
@@ -87,13 +87,13 @@ export const CLIS = {
   },
   codex: {
     label: 'Codex CLI',
-    models: ['gpt-5.2-codex', 'gpt-5.2', 'o5-mini'],
+    models: ['gpt-5.6-luna'],
     argv: (model) => ['codex', 'exec', '-m', model, '--skip-git-repo-check', '-'],
     extract: (stdout) => stdout,
   },
   agy: {
     label: 'Antigravity CLI',
-    models: ['gemini-3-pro', 'gemini-3-flash'],
+    models: ['gemini-3.6-flash'],
     argv: (model) => ['agy', '-p', '--model', model],
     extract: (stdout) => stdout,
   },
@@ -139,18 +139,27 @@ export function runCli({ cli, model, prompt, timeoutMs = 180_000 }) {
 
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { cwd: sandbox, shell: !stub && process.platform === 'win32' });
-    let out = '', err = '';
+    let out = '', err = '', settled = false;
+    // close/timeout/spawn-error 중 무엇이 먼저 오든 프라미스는 딱 한 번만 정착한다.
+    const settleResolve = (v) => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } };
+    const settleReject = (e) => { if (!settled) { settled = true; clearTimeout(timer); reject(e); } };
     const timer = setTimeout(() => {
       child.kill();
-      reject(new Error(`CLI 타임아웃 (${timeoutMs / 1000}초)`));
+      const e = new Error(`CLI 타임아웃 (${timeoutMs / 1000}초)`);
+      e.rawOutput = out; // 타임아웃 이전까지의 stdout도 보존 — 폐기 금지
+      settleReject(e);
     }, timeoutMs);
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (err += d));
-    child.on('error', (e) => { clearTimeout(timer); reject(e); });
+    child.on('error', (e) => { e.rawOutput = out; settleReject(e); });
+    child.stdin.on('error', () => { /* EPIPE 등 — close/error 핸들러가 최종 처리하므로 여기서는 삼킨다 */ });
     child.on('close', (code) => {
-      clearTimeout(timer);
-      if (code !== 0) return reject(new Error(`CLI 종료코드 ${code}: ${err.slice(0, 500)}`));
-      resolve(def.extract(out));
+      if (code !== 0) {
+        const e = new Error(`CLI 종료코드 ${code}: ${err.slice(0, 500)}`);
+        e.rawOutput = out; // 비정상 종료 이전까지의 stdout도 보존 — 폐기 금지
+        return settleReject(e);
+      }
+      settleResolve(def.extract(out));
     });
     child.stdin.write(prompt);
     child.stdin.end(); // agy Windows hang 대응 — 반드시 즉시 닫기
@@ -197,7 +206,7 @@ test('correction pipeline with stub cli', async (t) => {
   t.after(() => app.close());
 
   const res = await app.inject({ method: 'POST', url: '/api/corrections',
-    payload: { input_text: 'I am jogging since two years.', cli: 'claude', model: 'claude-fable-5' } });
+    payload: { input_text: 'I am jogging since two years.', cli: 'claude', model: 'claude-sonnet-5' } });
   assert.equal(res.statusCode, 202);
 
   const row = await waitDone(app, `/api/corrections/${res.json().id}`);
@@ -215,6 +224,13 @@ test('unknown cli rejected', async (t) => {
   assert.equal(res.statusCode, 400);
 });
 ```
+
+> 리뷰 수정 라운드에서 추가된 회귀 테스트(같은 파일, `server/test/fixtures/stub-cli-bad-json.js` / `stub-cli-fail.js` 픽스처 사용):
+> - `model` 화이트리스트 밖 값(`cli:'claude', model:'not-a-real-model; rm -rf /'`) → `400`.
+> - CLI가 파싱 불가능한 stdout을 낸 경우 → `status:'error'`이면서 `raw_output`이 보존됨.
+> - CLI가 stdout을 쓴 뒤 0이 아닌 코드로 종료한 경우 → `status:'error'`이면서 그 stdout이 `raw_output`에 보존됨.
+>
+> `OPICT_CLI_STUB`은 `runCli` 호출 시점에 읽히므로, 각 테스트가 `process.env.OPICT_CLI_STUB`을 해당 픽스처로 바꿨다가 `finally`에서 기본 스텁으로 복원하는 방식으로 케이스별 스텁을 전환한다.
 
 Run: `cd server && npm test` — Expected: FAIL
 
@@ -264,7 +280,12 @@ export async function runCorrection(repos, id) {
     }
     repos.corrections.setStatus(id, { status: 'done', result_json: JSON.stringify(parsed), raw_output: raw });
   } catch (e) {
-    repos.corrections.setStatus(id, { status: 'error', error_message: `CLI 실행 실패: ${e.message}` });
+    // e.rawOutput은 runCli가 실패 직전까지의 stdout을 실어보낸 것 — 있으면 반드시 보존한다.
+    repos.corrections.setStatus(id, {
+      status: 'error',
+      raw_output: e.rawOutput || null,
+      error_message: `CLI 실행 실패: ${e.message}`,
+    });
   }
 }
 ```
@@ -281,8 +302,10 @@ export async function correctionsRoutes(app) {
 
   app.post('/api/corrections', async (req, reply) => {
     const { input_text, cli, model } = req.body ?? {};
-    if (!input_text?.trim() || !CLIS[cli] || !model)
-      return reply.code(400).send({ error: 'input_text, cli(claude|codex|agy), model은 필수입니다' });
+    // model은 해당 cli의 CLIS[cli].models 화이트리스트에 있는 값만 허용 —
+    // shell:true(Windows)로 spawn되는 argv에 그대로 흘러들어가므로 임의 문자열 통과 금지.
+    if (!input_text?.trim() || !CLIS[cli] || !model || !CLIS[cli].models.includes(model))
+      return reply.code(400).send({ error: 'input_text, cli(claude|codex|agy), model(해당 cli의 지원 모델)은 필수입니다' });
     const row = repos.corrections.create({ input_text: input_text.trim(), cli, model });
     enqueue(() => runCorrection(repos, row.id)); // 응답과 분리해 백그라운드 직렬 실행
     return reply.code(202).send({ id: row.id });
@@ -311,7 +334,7 @@ export async function metaRoutes(app) {
 
 - [ ] **Step 6: 테스트 통과 확인**
 
-Run: `cd server && npm test` — Expected: PASS (parse 4 + corrections 2 포함)
+Run: `cd server && npm test` — Expected: PASS (parse 4 + corrections 5 포함: 원래 2 + 리뷰 수정 라운드에서 추가된 화이트리스트·raw_output 보존 회귀 테스트 3)
 
 - [ ] **Step 7: 커밋**
 
@@ -327,7 +350,7 @@ cd server && npm run dev
 curl localhost:3000/api/meta/clis     # CLI 3종·모델 목록
 # 실제 CLI 검증 (claude 로그인 상태 필요):
 curl -X POST localhost:3000/api/corrections -H "content-type: application/json" ^
-  -d "{\"input_text\":\"I am jogging since two years.\",\"cli\":\"claude\",\"model\":\"claude-fable-5\"}"
+  -d "{\"input_text\":\"I am jogging since two years.\",\"cli\":\"claude\",\"model\":\"claude-sonnet-5\"}"
 # → {"id":1} 반환 후:
 curl localhost:3000/api/corrections/1  # status가 pending→running→done으로 변하고 result_json 채워짐
 ```
