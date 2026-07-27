@@ -7,7 +7,7 @@
 **Interfaces:**
 - Consumes: `app.repos`(01)
 - Produces:
-  - `CLIS` (`ai/clis.js`): `{ claude: {label, models: string[], promptMode: 'stdin'|'argv', argv(model, prompt?): string[], extract(stdout): string}, codex: {...}, agy: {...} }` — 모델 목록·플래그의 단일 출처. `promptMode`가 `'argv'`면 프롬프트를 stdin이 아니라 인자로 넘긴다(agy).
+  - `CLIS` (`ai/clis.js`): `{ claude: {label, models: string[], promptMode: 'stdin'|'argv', bin(): string[], argv(model, prompt?): string[], extract(stdout): string}, codex: {...}, agy: {...} }` — 모델 목록·플래그·실행 파일 경로의 단일 출처. `bin()`은 실행 파일 후보를 우선순위대로 주고, runner가 처음 존재하는 것을 쓴다(.cmd 래퍼보다 .exe 우선). `promptMode`가 `'argv'`면 프롬프트를 stdin이 아니라 인자로 넘긴다(agy).
   - `runCli({cli, model, prompt, timeoutMs?}) → Promise<string>` (`ai/runner.js`) — stdout 원문 반환. 환경변수 `OPICT_CLI_STUB`가 있으면 어떤 cli든 `node $OPICT_CLI_STUB`를 실행(테스트용).
   - `lenientJson(text) → object | null` (`ai/parse.js`)
   - `enqueue(fn) → Promise` (`ai/queue.js`) — 서버 전역 직렬 큐. **평가 파이프라인(09)도 이 큐를 사용.**
@@ -76,13 +76,38 @@ export function enqueue(fn) {
 `server/src/ai/clis.js` — 모델 목록은 필요 시 여기만 수정 (각 CLI당 모델 1개, 배열 형태 유지):
 
 ```js
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+
+// CLI 어댑터 테이블 — 모델 ID·플래그·실행 파일 경로가 바뀌면 이 파일만 고친다.
+//
+// bin(): 실행 파일 후보를 우선순위대로. runner가 처음 존재하는 것을 쓰고, 없으면 마지막 값을 그대로 쓴다.
+//   .cmd 배치 래퍼는 exit code·stdin 전달이 어긋나므로 .exe 를 먼저 찾는다(drillup에서 검증된 방식).
+// promptMode:
+//   'stdin' — 프롬프트를 stdin으로 넘기고 즉시 닫는다(agy Windows hang 대응).
+//   'argv'  — 프롬프트를 인자로 넘긴다. 셸을 거치지 않으므로 따옴표·개행이 원문 그대로 전달된다.
+// argv(): 실행 파일 뒤에 붙는 인자만. 명령 자체는 bin()이 정한다.
+
+const win = process.platform === 'win32';
+const home = () => homedir();
+const localAppData = () => process.env.LOCALAPPDATA ?? join(home(), 'AppData', 'Local');
+const npmModules = () => join(home(), 'AppData', 'Roaming', 'npm', 'node_modules');
+const codexVendor = (triple, arch) =>
+  join(npmModules(), '@openai', 'codex', 'node_modules', '@openai',
+    `codex-win32-${arch}`, 'vendor', triple, 'bin', 'codex.exe');
+
 export const CLIS = {
   claude: {
     label: 'Claude Code',
     models: ['claude-haiku-4-5-20251001'],
     promptMode: 'stdin',
-    argv: (model) => ['claude', '-p', '--model', model, '--effort', 'low',
-      '--output-format', 'json', '--disallowedTools', '*', '--no-session'],
+    bin: () => win
+      ? [join(home(), '.local', 'bin', 'claude.exe'),
+         join(npmModules(), '@anthropic-ai', 'claude-code', 'bin', 'claude.exe'),
+         'claude.cmd']
+      : [join(home(), '.local', 'bin', 'claude'), '/usr/local/bin/claude', 'claude'],
+    argv: (model) => ['--model', model, '--effort', 'low', '--output-format', 'json',
+      '--disallowedTools', '*', '-p'],
     // claude는 {result: "..."} 봉투로 출력 → result만 꺼냄. 실패 시 원문 그대로.
     extract: (stdout) => { try { return JSON.parse(stdout).result ?? stdout; } catch { return stdout; } },
   },
@@ -90,21 +115,32 @@ export const CLIS = {
     label: 'Codex CLI',
     models: ['gpt-5.6-luna'],
     promptMode: 'stdin',
-    argv: (model) => ['codex', 'exec', '-m', model,
-      '-c', 'model_reasoning_effort="low"', '--skip-git-repo-check', '-'],
+    bin: () => win
+      ? [codexVendor('x86_64-pc-windows-msvc', 'x64'),
+         codexVendor('aarch64-pc-windows-msvc', 'arm64'),
+         'codex.cmd']
+      : [join(home(), '.local', 'bin', 'codex'), '/usr/local/bin/codex', 'codex'],
+    // -c 값의 따옴표는 codex의 TOML 파서가 요구한다. 셸을 거치지 않아야 그대로 도착한다.
+    argv: (model) => ['exec', '--model', model, '-c', 'model_reasoning_effort="low"',
+      '--skip-git-repo-check', '-'],
     extract: (stdout) => stdout,
   },
   agy: {
     label: 'Antigravity CLI',
     models: ['gemini-3.6-flash'],
     promptMode: 'argv',
-    argv: (model, prompt) => ['agy', '-p', prompt, '--model', model, '--effort', 'low'],
+    bin: () => win
+      ? [join(localAppData(), 'agy', 'bin', 'agy.exe'),
+         join(home(), 'AppData', 'Local', 'agy', 'bin', 'agy.exe'),
+         'agy.exe']
+      : [join(home(), '.local', 'bin', 'agy'), '/usr/local/bin/agy', 'agy'],
+    argv: (model, prompt) => ['-p', prompt, '--model', model, '--effort', 'low'],
     extract: (stdout) => stdout,
   },
 };
 ```
 
-> 주의: 위 모델 ID·플래그는 구현 시점에 각 CLI의 `--help`로 실제 값을 확인해 갱신할 것(자주 바뀜). 이 파일만 고치면 되도록 설계되어 있다.
+> 위 모델 ID·플래그·실행 파일 경로는 2026-07-27 세 CLI 실제 호출로 확인했다(claude/codex/agy 모두 교정 JSON 정상 수신). 값이 바뀌면 이 파일만 고치면 된다.
 
 `server/src/ai/prompts.js`:
 
@@ -126,7 +162,7 @@ export function buildCorrectionPrompt(inputText) {
 
 ```js
 import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CLIS } from './clis.js';
@@ -135,42 +171,34 @@ import { CLIS } from './clis.js';
 const sandbox = join(tmpdir(), 'opict-sandbox');
 mkdirSync(sandbox, { recursive: true });
 
-// 프롬프트를 인자로 넘기는 CLI(agy)는 명령줄에 개행을 실을 수 없다. 줄을 공백으로 접는다.
-const flattenPrompt = (prompt) => String(prompt).replace(/\s*\n\s*/g, ' ').trim();
+const resolved = new Map();
 
-// cmd.exe 경유 실행용 인용. 셸이 인자를 다시 쪼개지 않도록 우리가 직접 감싼다.
-// 주의: cmd.exe는 따옴표 안에서도 %VAR%를 확장하므로, 프롬프트에 %가 들어가면 그대로 넘어가지 않는다.
-const quoteForCmd = (arg) => `"${String(arg).replace(/"/g, '""')}"`;
+// 존재하는 첫 후보를 고른다. 하나도 없으면 마지막 후보(이름만)를 PATH 탐색에 맡긴다.
+function resolveBin(cli, def) {
+  if (!resolved.has(cli)) {
+    const candidates = def.bin();
+    resolved.set(cli, candidates.find(existsSync) ?? candidates.at(-1));
+  }
+  return resolved.get(cli);
+}
 
 /**
  * 실제로 spawn할 명령·인자·옵션을 만든다. 테스트에서 조립 결과만 검증할 수 있도록 분리.
  */
 export function buildInvocation({ cli, model, prompt, stub }) {
-  const def = CLIS[cli];
   if (stub) {
     // 테스트 스텁은 항상 stdin으로 프롬프트를 받는다.
     return { cmd: process.execPath, args: [stub], opts: {}, stdinPrompt: prompt };
   }
+  const def = CLIS[cli];
+  const cmd = resolveBin(cli, def);
+  // 셸은 .cmd/.bat 래퍼로 떨어졌을 때만. 셸을 거치면 인자가 따옴표 없이 이어붙어
+  // 프롬프트의 따옴표·개행에서 인자 경계가 깨지고, 프롬프트 내용이 명령줄로 새어나간다.
+  const opts = { shell: /\.(cmd|bat)$/i.test(cmd), windowsHide: true };
 
-  if (def.promptMode !== 'argv') {
-    const [cmd, ...args] = def.argv(model);
-    // Windows에서 CLI들은 .cmd 셈으로 설치되므로 셸을 거쳐야 실행된다.
-    return { cmd, args, opts: { shell: process.platform === 'win32' }, stdinPrompt: prompt };
-  }
-
-  const parts = def.argv(model, flattenPrompt(prompt));
-  if (process.platform !== 'win32') {
-    const [cmd, ...args] = parts;
-    return { cmd, args, opts: {}, stdinPrompt: null };
-  }
-  // shell:true는 인자를 그대로 이어붙여 프롬프트가 명령줄로 새어나간다.
-  // cmd.exe를 직접 띄우고 인용은 우리가 하되, Node가 다시 손대지 않도록 verbatim으로 넘긴다.
-  return {
-    cmd: process.env.ComSpec || 'cmd.exe',
-    args: ['/d', '/s', '/c', `"${parts.map(quoteForCmd).join(' ')}"`],
-    opts: { windowsVerbatimArguments: true },
-    stdinPrompt: null,
-  };
+  return def.promptMode === 'argv'
+    ? { cmd, args: def.argv(model, prompt), opts, stdinPrompt: null }
+    : { cmd, args: def.argv(model), opts, stdinPrompt: prompt };
 }
 
 export function runCli({ cli, model, prompt, timeoutMs = 180_000 }) {
@@ -191,9 +219,16 @@ export function runCli({ cli, model, prompt, timeoutMs = 180_000 }) {
       e.rawOutput = out;
       settleReject(e);
     }, timeoutMs);
+    // 한글 응답이 청크 경계에서 잘리지 않도록 스트림 단위로 디코딩한다.
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (err += d));
-    child.on('error', (e) => { e.rawOutput = out; settleReject(e); });
+    child.on('error', (cause) => {
+      const e = new Error(`CLI 실행 파일을 실행할 수 없습니다 (${cmd}): ${cause.message}`, { cause });
+      e.rawOutput = out;
+      settleReject(e);
+    });
     child.stdin.on('error', () => { /* EPIPE 등 — close/error 핸들러가 최종 처리 */ });
     child.on('close', (code) => {
       if (code !== 0) {
@@ -203,7 +238,7 @@ export function runCli({ cli, model, prompt, timeoutMs = 180_000 }) {
       }
       settleResolve(def.extract(out));
     });
-    if (stdinPrompt !== null) child.stdin.write(stdinPrompt);
+    if (stdinPrompt !== null) child.stdin.write(stdinPrompt, 'utf-8');
     child.stdin.end(); // agy Windows hang 대응 — 반드시 즉시 닫기
   });
 }

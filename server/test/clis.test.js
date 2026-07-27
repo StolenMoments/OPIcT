@@ -16,12 +16,30 @@ test('모든 CLI가 effort low로 호출된다', () => {
     ['--effort', 'low']);
 });
 
-test('agy는 프롬프트를 -p 인자로 받고 stdin으로는 보내지 않는다', () => {
-  const inv = buildInvocation({ cli: 'agy', model: 'gemini-3.6-flash', prompt: 'line one\nline two' });
+test('실행 파일은 .cmd 래퍼보다 .exe 후보를 먼저 쓴다', () => {
+  for (const [name, def] of Object.entries(CLIS)) {
+    const candidates = def.bin();
+    assert.ok(candidates.length > 1, name);
+    assert.ok(!/\.(cmd|bat)$/i.test(candidates[0]), `${name}: ${candidates[0]}`);
+  }
+});
+
+test('셸은 .cmd 래퍼로 떨어졌을 때만 켠다', () => {
+  for (const cli of Object.keys(CLIS)) {
+    const inv = buildInvocation({ cli, model: CLIS[cli].models[0], prompt: 'p' });
+    assert.equal(inv.opts.shell, /\.(cmd|bat)$/i.test(inv.cmd), `${cli}: ${inv.cmd}`);
+  }
+});
+
+test('agy는 프롬프트를 -p 인자로 원문 그대로 받고 stdin으로는 보내지 않는다', () => {
+  const prompt = 'line one\nsays "quoted" & more';
+  const inv = buildInvocation({ cli: 'agy', model: 'gemini-3.6-flash', prompt });
   assert.equal(inv.stdinPrompt, null);
-  const flat = 'line one line two'; // 명령줄에는 개행을 실을 수 없어 공백으로 접는다
-  assert.ok(JSON.stringify(inv.args).includes(flat), JSON.stringify(inv.args));
-  assert.ok(JSON.stringify(inv.args).includes('gemini-3.6-flash'));
+  // 따옴표·개행이 든 프롬프트가 하나의 인자로 온전히 들어가야 한다.
+  assert.equal(inv.args[inv.args.indexOf('-p') + 1], prompt);
+  assert.equal(inv.args[inv.args.indexOf('--model') + 1], 'gemini-3.6-flash');
+  // 셸을 거치면 인자 경계가 깨지므로 agy는 .exe로 해석돼 셸 없이 실행돼야 한다.
+  assert.ok(!inv.opts.shell, JSON.stringify(inv.opts));
 });
 
 test('stdin 방식 CLI는 프롬프트를 원문 그대로 stdin으로 보낸다', () => {

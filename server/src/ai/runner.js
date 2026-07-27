@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CLIS } from './clis.js';
@@ -8,42 +8,34 @@ import { CLIS } from './clis.js';
 const sandbox = join(tmpdir(), 'opict-sandbox');
 mkdirSync(sandbox, { recursive: true });
 
-// 프롬프트를 인자로 넘기는 CLI(agy)는 명령줄에 개행을 실을 수 없다. 줄을 공백으로 접는다.
-const flattenPrompt = (prompt) => String(prompt).replace(/\s*\n\s*/g, ' ').trim();
+const resolved = new Map();
 
-// cmd.exe 경유 실행용 인용. 셸이 인자를 다시 쪼개지 않도록 우리가 직접 감싼다.
-// 주의: cmd.exe는 따옴표 안에서도 %VAR%를 확장하므로, 프롬프트에 %가 들어가면 그대로 넘어가지 않는다.
-const quoteForCmd = (arg) => `"${String(arg).replace(/"/g, '""')}"`;
+// 존재하는 첫 후보를 고른다. 하나도 없으면 마지막 후보(이름만)를 PATH 탐색에 맡긴다.
+function resolveBin(cli, def) {
+  if (!resolved.has(cli)) {
+    const candidates = def.bin();
+    resolved.set(cli, candidates.find(existsSync) ?? candidates.at(-1));
+  }
+  return resolved.get(cli);
+}
 
 /**
  * 실제로 spawn할 명령·인자·옵션을 만든다. 테스트에서 조립 결과만 검증할 수 있도록 분리.
  */
 export function buildInvocation({ cli, model, prompt, stub }) {
-  const def = CLIS[cli];
   if (stub) {
     // 테스트 스텁은 항상 stdin으로 프롬프트를 받는다.
     return { cmd: process.execPath, args: [stub], opts: {}, stdinPrompt: prompt };
   }
+  const def = CLIS[cli];
+  const cmd = resolveBin(cli, def);
+  // 셸은 .cmd/.bat 래퍼로 떨어졌을 때만. 셸을 거치면 인자가 따옴표 없이 이어붙어
+  // 프롬프트의 따옴표·개행에서 인자 경계가 깨지고, 프롬프트 내용이 명령줄로 새어나간다.
+  const opts = { shell: /\.(cmd|bat)$/i.test(cmd), windowsHide: true };
 
-  if (def.promptMode !== 'argv') {
-    const [cmd, ...args] = def.argv(model);
-    // Windows에서 CLI들은 .cmd 셈으로 설치되므로 셸을 거쳐야 실행된다.
-    return { cmd, args, opts: { shell: process.platform === 'win32' }, stdinPrompt: prompt };
-  }
-
-  const parts = def.argv(model, flattenPrompt(prompt));
-  if (process.platform !== 'win32') {
-    const [cmd, ...args] = parts;
-    return { cmd, args, opts: {}, stdinPrompt: null };
-  }
-  // shell:true는 인자를 그대로 이어붙여 프롬프트가 명령줄로 새어나간다.
-  // cmd.exe를 직접 띄우고 인용은 우리가 하되, Node가 다시 손대지 않도록 verbatim으로 넘긴다.
-  return {
-    cmd: process.env.ComSpec || 'cmd.exe',
-    args: ['/d', '/s', '/c', `"${parts.map(quoteForCmd).join(' ')}"`],
-    opts: { windowsVerbatimArguments: true },
-    stdinPrompt: null,
-  };
+  return def.promptMode === 'argv'
+    ? { cmd, args: def.argv(model, prompt), opts, stdinPrompt: null }
+    : { cmd, args: def.argv(model), opts, stdinPrompt: prompt };
 }
 
 export function runCli({ cli, model, prompt, timeoutMs = 180_000 }) {
@@ -64,9 +56,16 @@ export function runCli({ cli, model, prompt, timeoutMs = 180_000 }) {
       e.rawOutput = out;
       settleReject(e);
     }, timeoutMs);
+    // 한글 응답이 청크 경계에서 잘리지 않도록 스트림 단위로 디코딩한다.
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (err += d));
-    child.on('error', (e) => { e.rawOutput = out; settleReject(e); });
+    child.on('error', (cause) => {
+      const e = new Error(`CLI 실행 파일을 실행할 수 없습니다 (${cmd}): ${cause.message}`, { cause });
+      e.rawOutput = out;
+      settleReject(e);
+    });
     child.stdin.on('error', () => { /* EPIPE 등 — close/error 핸들러가 최종 처리 */ });
     child.on('close', (code) => {
       if (code !== 0) {
@@ -76,7 +75,7 @@ export function runCli({ cli, model, prompt, timeoutMs = 180_000 }) {
       }
       settleResolve(def.extract(out));
     });
-    if (stdinPrompt !== null) child.stdin.write(stdinPrompt);
+    if (stdinPrompt !== null) child.stdin.write(stdinPrompt, 'utf-8');
     child.stdin.end(); // agy Windows hang 대응 — 반드시 즉시 닫기
   });
 }
