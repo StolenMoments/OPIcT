@@ -71,6 +71,7 @@ Register: **product** (design serves the task). 사용자는 연습 중이고, U
 
 - 스페이싱: 4 / 8 / 12 / 16 / 24 / 32 / 48 (`--s-1`…`--s-7`). 리듬을 위해 섹션 간격은 크게, 요소 간격은 작게 — 균일하게 깔지 말 것.
 - radius: 컨트롤 8px, 카드·패널 12px, 태그·상태칩 999px. **16px 초과 금지.**
+- **예외 (연습 화면 녹음 버튼 단 하나만)**: 연습 화면의 단일 주 녹음 컨트롤(녹음 시작/종료·제출)은 엄지로 누르기 편해야 하는 이 앱의 핵심 액션이므로 `height: 56px`, `border-radius: var(--r-pill)`(999px)을 허용한다. 값은 `.practice-record__btn`(`web/src/pages/PracticePage.css`)에 고정. 다른 컨트롤·버튼은 이 예외를 참조하지 않는다 — 일반 Button 세 번째 size를 새로 만들지 말 것.
 - 보더와 큰 그림자를 같은 요소에 겹치지 않는다. 어두운 UI에서는 보더 1px만 쓰고 그림자는 떠 있는 것(팝오버·토스트)에만.
 - **카드 남용 금지.** 목록은 카드 그리드가 아니라 구분선 있는 행(row)으로. 카드 중첩은 항상 오답.
 
@@ -89,7 +90,7 @@ Register: **product** (design serves the task). 사용자는 연습 중이고, U
 
 전부 `web/src/styles/` 의 CSS와 `web/src/components/ui/` 의 얇은 래퍼로 구현한다. UI 라이브러리 추가 금지.
 
-- **Button** — variant: `primary`(액센트 채움) / `default`(보더) / `ghost`(투명) / `danger`. size: `md`(높이 40px) / `sm`(32px). 모든 variant에 hover·active·`:focus-visible`(2px `--focus` 아웃라인, offset 2px)·disabled·loading(라벨 유지 + 좌측 스피너, 폭 변하지 않게) 상태.
+- **Button** — variant: `primary`(액센트 채움) / `default`(보더) / `ghost`(투명) / `danger`. size: `md`(높이 40px) / `sm`(32px). 모든 variant에 hover·active·`:focus-visible`(2px `--focus` 아웃라인, offset 2px)·disabled·loading(라벨 유지 + 좌측 스피너, 폭 변하지 않게) 상태. 세 번째 size는 만들지 않는다 — 연습 화면 녹음 버튼의 56px/pill radius는 위 공간·형태 섹션에 적힌 단일·명명된 예외이며 `.practice-record__btn` 클래스로 `primary` variant 위에 국소적으로 얹는다.
 - **Field** — label + control + 선택적 힌트/에러. input·textarea·select 가 동일한 높이·보더·radius·포커스 링을 공유한다.
 - **Row list** — `<ul>` 에 `border-bottom: 1px solid --line`, 마지막 항목 제외. 각 행: 주 텍스트 + 보조 메타 + 우측 액션. hover 시 `--surface` 배경.
 - **Status pill** — `pending`/`running` = `--ink-muted` 보더 + 점 pulse, `done` = `--success`, `error` = `--danger`. 텍스트는 한국어.

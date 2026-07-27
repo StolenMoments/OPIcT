@@ -1,8 +1,19 @@
 .attempt-pipeline {
   display: flex;
   align-items: center;
-  gap: var(--s-2);
+  gap: var(--s-3);
   flex-wrap: wrap;
+}
+
+.attempt-pipeline__stage {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+
+.attempt-pipeline__stage-label {
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
 }
 
 .attempt-pipeline__label {

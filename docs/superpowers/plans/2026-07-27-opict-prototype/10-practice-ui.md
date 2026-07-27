@@ -103,7 +103,7 @@ export function useRecorder() {
 
 - [ ] **Step 3: AttemptResult** — `web/src/components/AttemptResult.tsx`
 
-브리프의 초안과 달리(컨트롤러 결의 2, 4): 인라인 `style`을 디자인 시스템 컴포넌트(`ErrorBanner`, `StatusPill`, `.section`/`.row-list`)로 교체하고, `JSON.parse`를 `safeParseResult`로 감싸 실패 시 "결과를 표시할 수 없습니다" + 원문 보기로 폴백한다(크래시 불가). 진행 상태는 `uploaded → transcribing → evaluating` 3단계를 `StatusPill` 시퀀스로 렌더링하고 `aria-live="polite"`로 감싼다.
+브리프의 초안과 달리(컨트롤러 결의 2, 4): 인라인 `style`을 디자인 시스템 컴포넌트(`ErrorBanner`, `StatusPill`, `.section`/`.row-list`)로 교체하고, `JSON.parse`를 `safeParseResult`로 감싸 실패 시 "결과를 표시할 수 없습니다" + 원문 보기로 폴백한다(크래시 불가). 진행 상태는 `uploaded → transcribing → evaluating` 3단계를 `StatusPill` 시퀀스로 렌더링하고 `aria-live="polite"`로 감싼다. (리뷰 finding 4 수정) `PIPELINE[].label`을 실제로 각 pill 옆에 렌더해 세 pill이 어느 단계인지 구분되게 한다 — 이전 구현은 `label`을 정의만 하고 쓰지 않아 세 pill이 서로 구분 불가능했다.
 
 ```tsx
 import ErrorBanner from './ui/ErrorBanner';
@@ -158,7 +158,12 @@ export default function AttemptResult({ row }: { row: Attempt }) {
   if (row.status !== 'done') {
     return (
       <div className="attempt-pipeline" aria-live="polite">
-        {PIPELINE.map((stage) => <StatusPill key={stage.key} status={pillStatusFor(row.status, stage.key)} />)}
+        {PIPELINE.map((stage) => (
+          <span key={stage.key} className="attempt-pipeline__stage">
+            <span className="attempt-pipeline__stage-label">{stage.label}</span>
+            <StatusPill status={pillStatusFor(row.status, stage.key)} />
+          </span>
+        ))}
         <span className="attempt-pipeline__label">{STATUS_KO[row.status] ?? row.status}…</span>
       </div>
     );
@@ -201,10 +206,12 @@ export default function AttemptResult({ row }: { row: Attempt }) {
 
 흐름: CategoryPicker → 문항 목록 → 문항 선택 → 질문 표시 + CliPicker(설정 기본값 프리로드) + 녹음 시작/정지 → 정지 시 자동 업로드(`POST /api/attempts` FormData, `api()` 경유) → usePolling(CorrectPage와 동일한 `row?.id === attemptId` 게이트 + status 기반 `active`) → AttemptResult.
 
-브리프 대비 변경(컨트롤러 결의 1·2·3): raw `fetch` 대신 `api()`(FormData 지원하도록 `api.ts` 수정, 아래 참고)를 사용하고, `alert()` 대신 `err`/`guard()`/`ErrorBanner` 패턴을 쓰며, 폴링은 `attemptId`가 settled 되면 멈추고 이전 attempt 행을 절대 렌더하지 않는다. 디자인 시스템 준수를 위해 인라인 style을 전부 걷어내고 `Button`/`ErrorBanner`/`EmptyState`/`Skeleton`/`CategoryPicker`/`CliPicker`/`AttemptResult`와 `PracticePage.css`(문항 텍스트, 녹음 버튼, 앰버 탤리 램프 pulse, 경과 시간)로 대체했다. 빈 상태 3종(카테고리 미선택, 문항 없음, 아직 시도 없음)을 추가했다.
+브리프 대비 변경(컨트롤러 결의 1·2·3, + 리뷰 findings 2·3): raw `fetch` 대신 `api()`(FormData 지원하도록 `api.ts` 수정, 아래 참고)를 사용하고, `alert()` 대신 `err`/`guard()`/`ErrorBanner` 패턴을 쓰며, 폴링은 `attemptId`가 settled 되면 멈추고 이전 attempt 행을 절대 렌더하지 않는다. 디자인 시스템 준수를 위해 인라인 style을 전부 걷어내고 `Button`/`ErrorBanner`/`EmptyState`/`Skeleton`/`CategoryPicker`/`CliPicker`/`AttemptResult`와 `PracticePage.css`(문항 텍스트, 녹음 버튼, 앰버 탤리 램프 pulse, 경과 시간)로 대체했다. 빈 상태 3종(카테고리 미선택, 문항 없음, 아직 시도 없음)을 추가했다.
+
+리뷰에서 지적된 두 결함(findings 2·3)을 고쳤다: `handleFinish`는 클릭 시점의 `question_id`를 `questionId` 지역 변수로 고정해 업로드 바디에 쓰고, 업로드 성공 콜백은 `qRef`(매 렌더마다 `q`를 미러링하는 ref — 클로저로 캡처한 `q`는 await 이후 갱신되지 않으므로)와 비교해 사용자가 그 사이 다른 문항으로 넘어갔으면 `setAttemptId`/`setActive`를 호출하지 않는다. `submitting` 플래그를 추가해 `handleFinish` 전체 구간 동안 녹음 시작(`busy`에 포함)·녹음 종료·제출(`disabled`+`loading`)·← 문항 목록을 모두 잠가, 업로드 도중 새 녹음을 시작하거나 문항을 바꿔 두 시도가 동시에 진행되는 경로를 막는다.
 
 ```tsx
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import CategoryPicker from '../components/CategoryPicker';
 import CliPicker from '../components/CliPicker';
@@ -237,7 +244,13 @@ export default function PracticePage() {
   const [model, setModel] = useState('');
   const [attemptId, setAttemptId] = useState<number | null>(null);
   const [active, setActive] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const { recording, start, stop, elapsedSec, error: recorderError } = useRecorder();
+
+  // handleFinish의 async 클로저가 캡처한 q는 await 이후 갱신되지 않으므로,
+  // ref로 매 렌더의 최신 q를 미러링해 업로드 완료 시점의 "지금" 문항과 비교한다.
+  const qRef = useRef<Question | null>(q);
+  qRef.current = q;
 
   useEffect(() => {
     api<Record<string, string>>('/settings').then((s) => {
@@ -262,7 +275,7 @@ export default function PracticePage() {
   }, [row]);
 
   const settled = row?.status === 'done' || row?.status === 'error';
-  const busy = attemptId != null && !settled;
+  const busy = submitting || (attemptId != null && !settled);
 
   const selectQuestion = (question: Question) => {
     setQ(question); setAttemptId(null); setActive(false); setErr(null);
@@ -270,17 +283,26 @@ export default function PracticePage() {
 
   const handleStart = () => guard(() => start());
 
-  const handleFinish = () =>
-    guard(async () => {
-      const blob = await stop();
-      const form = new FormData();
-      form.append('audio', blob, 'answer.webm');
-      form.append('question_id', String(q!.id));
-      if (cli) { form.append('cli', cli); form.append('model', model); }
-      const { id } = await api<{ id: number }>('/attempts', { method: 'POST', body: form });
-      setAttemptId(id);
-      setActive(true);
+  const handleFinish = () => {
+    const questionId = q!.id; // 클릭 시점에 고정 — 업로드 바디와 완료 후 비교 모두 이 값을 쓴다
+    setSubmitting(true);
+    return guard(async () => {
+      try {
+        const blob = await stop();
+        const form = new FormData();
+        form.append('audio', blob, 'answer.webm');
+        form.append('question_id', String(questionId));
+        if (cli) { form.append('cli', cli); form.append('model', model); }
+        const { id } = await api<{ id: number }>('/attempts', { method: 'POST', body: form });
+        if (qRef.current?.id === questionId) { // 그 사이 다른 문항으로 넘어갔으면 무시
+          setAttemptId(id);
+          setActive(true);
+        }
+      } finally {
+        setSubmitting(false);
+      }
     });
+  };
 
   if (!q) {
     return (
@@ -312,7 +334,7 @@ export default function PracticePage() {
 
   return (
     <div className="page">
-      <Button variant="ghost" size="sm" onClick={() => setQ(null)} disabled={recording}>← 문항 목록</Button>
+      <Button variant="ghost" size="sm" onClick={() => setQ(null)} disabled={recording || submitting}>← 문항 목록</Button>
       {err && <ErrorBanner message={err} onDismiss={() => setErr(null)} />}
       {recorderError && <ErrorBanner message={recorderError} />}
 
@@ -334,15 +356,17 @@ export default function PracticePage() {
             <>
               <span className="practice-record__live" aria-hidden="true"><span className="practice-record__tally" /></span>
               <span className="practice-record__elapsed" role="status" aria-live="polite">녹음 중 {formatElapsed(elapsedSec)}</span>
-              <Button className="practice-record__btn" variant="primary" onClick={handleFinish}>녹음 종료·제출</Button>
+              <Button className="practice-record__btn" variant="primary" onClick={handleFinish} disabled={submitting} loading={submitting}>
+                녹음 종료·제출
+              </Button>
             </>
           )}
         </div>
       </div>
 
       {row && <div className="section"><AttemptResult row={row} /></div>}
-      {!row && attemptId != null && <Skeleton rows={2} />}
-      {!row && attemptId == null && !recording && (
+      {!row && (attemptId != null || submitting) && <Skeleton rows={2} />}
+      {!row && attemptId == null && !recording && !submitting && (
         <EmptyState message="아직 녹음한 답변이 없습니다. 녹음 시작을 눌러 답변해 보세요." />
       )}
     </div>

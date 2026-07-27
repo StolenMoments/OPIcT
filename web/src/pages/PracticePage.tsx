@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import CategoryPicker from '../components/CategoryPicker';
 import CliPicker from '../components/CliPicker';
@@ -36,7 +36,16 @@ export default function PracticePage() {
   const [model, setModel] = useState('');
   const [attemptId, setAttemptId] = useState<number | null>(null);
   const [active, setActive] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const { recording, start, stop, elapsedSec, error: recorderError } = useRecorder();
+
+  // `handleFinish`'s async closure captures `q` at click time, which React
+  // does not update once the async body resumes after an await. This ref
+  // mirrors the live `q` on every render so the post-upload check below
+  // reads the question actually selected *now*, not the one selected when
+  // the upload started.
+  const qRef = useRef<Question | null>(q);
+  qRef.current = q;
 
   useEffect(() => {
     api<Record<string, string>>('/settings').then((s) => {
@@ -78,7 +87,7 @@ export default function PracticePage() {
   }, [row]);
 
   const settled = row?.status === 'done' || row?.status === 'error';
-  const busy = attemptId != null && !settled;
+  const busy = submitting || (attemptId != null && !settled);
 
   const selectQuestion = (question: Question) => {
     setQ(question);
@@ -89,20 +98,38 @@ export default function PracticePage() {
 
   const handleStart = () => guard(() => start());
 
-  const handleFinish = () =>
-    guard(async () => {
-      const blob = await stop();
-      const form = new FormData();
-      form.append('audio', blob, 'answer.webm');
-      form.append('question_id', String(q!.id));
-      if (cli) {
-        form.append('cli', cli);
-        form.append('model', model);
+  const handleFinish = () => {
+    // Captured now, not read from state after the await: if the user
+    // navigates to a different question while the upload is still in
+    // flight, this closure's questionId stays pinned to the question that
+    // was actually recorded, so a late-arriving response can't attach its
+    // attemptId to whatever question happens to be selected by then.
+    const questionId = q!.id;
+    setSubmitting(true);
+    return guard(async () => {
+      try {
+        const blob = await stop();
+        const form = new FormData();
+        form.append('audio', blob, 'answer.webm');
+        form.append('question_id', String(questionId));
+        if (cli) {
+          form.append('cli', cli);
+          form.append('model', model);
+        }
+        const { id } = await api<{ id: number }>('/attempts', { method: 'POST', body: form });
+        // The user may have picked a different question while this was in
+        // flight (the back button and other controls are disabled while
+        // `submitting` is true, but this ref read is the authoritative
+        // check — it can't go stale the way a captured `q` would).
+        if (qRef.current?.id === questionId) {
+          setAttemptId(id);
+          setActive(true);
+        }
+      } finally {
+        setSubmitting(false);
       }
-      const { id } = await api<{ id: number }>('/attempts', { method: 'POST', body: form });
-      setAttemptId(id);
-      setActive(true);
     });
+  };
 
   if (!q) {
     return (
@@ -136,7 +163,7 @@ export default function PracticePage() {
 
   return (
     <div className="page">
-      <Button variant="ghost" size="sm" onClick={() => setQ(null)} disabled={recording}>
+      <Button variant="ghost" size="sm" onClick={() => setQ(null)} disabled={recording || submitting}>
         ← 문항 목록
       </Button>
 
@@ -171,7 +198,13 @@ export default function PracticePage() {
               <span className="practice-record__elapsed" role="status" aria-live="polite">
                 녹음 중 {formatElapsed(elapsedSec)}
               </span>
-              <Button className="practice-record__btn" variant="primary" onClick={handleFinish}>
+              <Button
+                className="practice-record__btn"
+                variant="primary"
+                onClick={handleFinish}
+                disabled={submitting}
+                loading={submitting}
+              >
                 녹음 종료·제출
               </Button>
             </>
@@ -184,8 +217,8 @@ export default function PracticePage() {
           <AttemptResult row={row} />
         </div>
       )}
-      {!row && attemptId != null && <Skeleton rows={2} />}
-      {!row && attemptId == null && !recording && (
+      {!row && (attemptId != null || submitting) && <Skeleton rows={2} />}
+      {!row && attemptId == null && !recording && !submitting && (
         <EmptyState message="아직 녹음한 답변이 없습니다. 녹음 시작을 눌러 답변해 보세요." />
       )}
     </div>

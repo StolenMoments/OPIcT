@@ -64,7 +64,10 @@ export default function AttemptResult({ row }: { row: Attempt }) {
     return (
       <div className="attempt-pipeline" aria-live="polite">
         {PIPELINE.map((stage) => (
-          <StatusPill key={stage.key} status={pillStatusFor(row.status, stage.key)} />
+          <span key={stage.key} className="attempt-pipeline__stage">
+            <span className="attempt-pipeline__stage-label">{stage.label}</span>
+            <StatusPill status={pillStatusFor(row.status, stage.key)} />
+          </span>
         ))}
         <span className="attempt-pipeline__label">{STATUS_KO[row.status] ?? row.status}…</span>
       </div>
