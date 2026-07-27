@@ -4,58 +4,75 @@ import CategoryPicker from '../components/CategoryPicker';
 import type { Category, CategoryType, Question } from '../types';
 
 export default function SettingsPage() {
+  const [err, setErr] = useState<string | null>(null);
+  const guard = useCallback(async (fn: () => Promise<void>) => {
+    try {
+      await fn();
+      setErr(null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
   // 카테고리 관리
   const [cats, setCats] = useState<Category[]>([]);
+  const [catsRefreshKey, setCatsRefreshKey] = useState(0);
   const [newType, setNewType] = useState<CategoryType>('survey');
   const [newName, setNewName] = useState('');
-  const loadCats = useCallback(() => api<Category[]>('/categories').then(setCats), []);
+  const loadCats = useCallback(() => api<Category[]>('/categories').then(setCats).catch(() => {}), []);
   useEffect(() => { loadCats(); }, [loadCats]);
 
-  const addCat = async () => {
+  const addCat = () => guard(async () => {
     if (!newName.trim()) return;
     await api('/categories', { method: 'POST', body: JSON.stringify({ type: newType, name: newName }) });
-    setNewName(''); loadCats();
-  };
-  const renameCat = async (c: Category) => {
+    setNewName(''); loadCats(); setCatsRefreshKey((k) => k + 1);
+  });
+  const renameCat = (c: Category) => guard(async () => {
     const name = prompt('새 이름', c.name);
     if (!name) return;
     await api(`/categories/${c.id}`, { method: 'PUT', body: JSON.stringify({ name }) });
-    loadCats();
-  };
-  const removeCat = async (c: Category) => {
+    loadCats(); setCatsRefreshKey((k) => k + 1);
+  });
+  const removeCat = (c: Category) => guard(async () => {
     if (!confirm(`"${c.name}" 삭제? 문항·노트도 함께 삭제됩니다.`)) return;
     await api(`/categories/${c.id}`, { method: 'DELETE' });
-    loadCats();
-  };
+    loadCats(); setCatsRefreshKey((k) => k + 1);
+    if (catId === c.id) {
+      setCatId(null);
+      setQuestions([]);
+    }
+  });
 
   // 문항 관리
   const [catId, setCatId] = useState<number | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [newQ, setNewQ] = useState('');
   const loadQs = useCallback(() => {
-    if (catId) api<Question[]>(`/questions?category_id=${catId}`).then(setQuestions);
+    if (catId) api<Question[]>(`/questions?category_id=${catId}`).then(setQuestions).catch(() => {});
   }, [catId]);
   useEffect(() => { loadQs(); }, [loadQs]);
 
-  const addQ = async () => {
+  const addQ = () => guard(async () => {
     if (!catId || !newQ.trim()) return;
     await api('/questions', { method: 'POST', body: JSON.stringify({ category_id: catId, text: newQ }) });
     setNewQ(''); loadQs();
-  };
-  const editQ = async (q: Question) => {
+  });
+  const editQ = (q: Question) => guard(async () => {
     const text = prompt('문항 수정', q.text);
     if (!text) return;
     await api(`/questions/${q.id}`, { method: 'PUT', body: JSON.stringify({ text }) });
     loadQs();
-  };
-  const removeQ = async (q: Question) => {
+  });
+  const removeQ = (q: Question) => guard(async () => {
     if (!confirm('문항 삭제?')) return;
     await api(`/questions/${q.id}`, { method: 'DELETE' });
     loadQs();
-  };
+  });
 
   return (
     <div>
+      {err && <p style={{ color: 'red' }}>{err}</p>}
+
       <h2>카테고리 관리</h2>
       <div style={{ display: 'flex', gap: 8 }}>
         <select value={newType} onChange={(e) => setNewType(e.target.value as CategoryType)}>
@@ -76,7 +93,7 @@ export default function SettingsPage() {
       </ul>
 
       <h2>문항 관리</h2>
-      <CategoryPicker value={catId} onChange={setCatId} />
+      <CategoryPicker value={catId} onChange={setCatId} refreshKey={catsRefreshKey} />
       {catId && (
         <>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>

@@ -7,7 +7,7 @@
 **Interfaces:**
 - Consumes: `api` 헬퍼(Task 03), 카테고리·문항 API(Task 02)
 - Produces:
-  - `CategoryPicker` — `{ value: number | null, onChange(id: number): void, type?: 'survey' | 'roleplay' }` props. 카테고리를 `<select>`로 고르는 공용 컴포넌트. **노트(05)·교정(07)·연습(10) 화면이 재사용.**
+  - `CategoryPicker` — `{ value: number | null, onChange(id: number): void, type?: 'survey' | 'roleplay', refreshKey?: number }` props(`refreshKey`는 선택값, 부모가 강제 재조회를 트리거할 때만 사용 — 기존 3개 prop만 넘겨도 동작). 카테고리를 `<select>`로 고르는 공용 컴포넌트. **노트(05)·교정(07)·연습(10) 화면이 재사용.**
   - `Category = { id: number; type: 'survey' | 'roleplay'; name: string; sort_order: number }`, `Question = { id: number; category_id: number; text: string; note: string | null }` 타입을 `web/src/types.ts`에 정의(Create에 추가).
 
 - [ ] **Step 1: 타입 정의** — `web/src/types.ts`
@@ -30,11 +30,14 @@ export default function CategoryPicker(props: {
   value: number | null;
   onChange: (id: number) => void;
   type?: CategoryType;
+  refreshKey?: number;
 }) {
   const [cats, setCats] = useState<Category[]>([]);
   useEffect(() => {
-    api<Category[]>(`/categories${props.type ? `?type=${props.type}` : ''}`).then(setCats);
-  }, [props.type]);
+    api<Category[]>(`/categories${props.type ? `?type=${props.type}` : ''}`)
+      .then(setCats)
+      .catch(() => {});
+  }, [props.type, props.refreshKey]);
   return (
     <select value={props.value ?? ''} onChange={(e) => props.onChange(Number(e.target.value))}>
       <option value="" disabled>카테고리 선택</option>
@@ -48,7 +51,7 @@ export default function CategoryPicker(props: {
 
 - [ ] **Step 3: SettingsPage에 관리 UI 구현** — `web/src/pages/SettingsPage.tsx` 전체 교체
 
-구성: 위쪽 "카테고리 관리"(type 선택 + 이름 입력 + 추가, 목록에 이름 인라인 수정·삭제 버튼), 아래쪽 "문항 관리"(CategoryPicker로 카테고리 선택 → 그 카테고리 문항 목록 + textarea로 추가, 항목별 수정·삭제).
+구성: 위쪽 "카테고리 관리"(type 선택 + 이름 입력 + 추가, 목록에 이름 인라인 수정·삭제 버튼), 아래쪽 "문항 관리"(CategoryPicker로 카테고리 선택 → 그 카테고리 문항 목록 + textarea로 추가, 항목별 수정·삭제). 모든 mutation 핸들러는 `api()`가 던지는 에러를 잡아 화면 상단에 표시하고(unhandled rejection 방지), 카테고리 추가/수정/삭제 시 `CategoryPicker`의 `refreshKey`를 올려 목록을 강제 재조회하며, 선택 중인 카테고리가 삭제되면 `catId`를 `null`로 리셋해 죽은 id로 요청이 나가지 않게 한다.
 
 ```tsx
 import { useCallback, useEffect, useState } from 'react';
@@ -57,58 +60,75 @@ import CategoryPicker from '../components/CategoryPicker';
 import type { Category, CategoryType, Question } from '../types';
 
 export default function SettingsPage() {
+  const [err, setErr] = useState<string | null>(null);
+  const guard = useCallback(async (fn: () => Promise<void>) => {
+    try {
+      await fn();
+      setErr(null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
   // 카테고리 관리
   const [cats, setCats] = useState<Category[]>([]);
+  const [catsRefreshKey, setCatsRefreshKey] = useState(0);
   const [newType, setNewType] = useState<CategoryType>('survey');
   const [newName, setNewName] = useState('');
-  const loadCats = useCallback(() => api<Category[]>('/categories').then(setCats), []);
+  const loadCats = useCallback(() => api<Category[]>('/categories').then(setCats).catch(() => {}), []);
   useEffect(() => { loadCats(); }, [loadCats]);
 
-  const addCat = async () => {
+  const addCat = () => guard(async () => {
     if (!newName.trim()) return;
     await api('/categories', { method: 'POST', body: JSON.stringify({ type: newType, name: newName }) });
-    setNewName(''); loadCats();
-  };
-  const renameCat = async (c: Category) => {
+    setNewName(''); loadCats(); setCatsRefreshKey((k) => k + 1);
+  });
+  const renameCat = (c: Category) => guard(async () => {
     const name = prompt('새 이름', c.name);
     if (!name) return;
     await api(`/categories/${c.id}`, { method: 'PUT', body: JSON.stringify({ name }) });
-    loadCats();
-  };
-  const removeCat = async (c: Category) => {
+    loadCats(); setCatsRefreshKey((k) => k + 1);
+  });
+  const removeCat = (c: Category) => guard(async () => {
     if (!confirm(`"${c.name}" 삭제? 문항·노트도 함께 삭제됩니다.`)) return;
     await api(`/categories/${c.id}`, { method: 'DELETE' });
-    loadCats();
-  };
+    loadCats(); setCatsRefreshKey((k) => k + 1);
+    if (catId === c.id) {
+      setCatId(null);
+      setQuestions([]);
+    }
+  });
 
   // 문항 관리
   const [catId, setCatId] = useState<number | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [newQ, setNewQ] = useState('');
   const loadQs = useCallback(() => {
-    if (catId) api<Question[]>(`/questions?category_id=${catId}`).then(setQuestions);
+    if (catId) api<Question[]>(`/questions?category_id=${catId}`).then(setQuestions).catch(() => {});
   }, [catId]);
   useEffect(() => { loadQs(); }, [loadQs]);
 
-  const addQ = async () => {
+  const addQ = () => guard(async () => {
     if (!catId || !newQ.trim()) return;
     await api('/questions', { method: 'POST', body: JSON.stringify({ category_id: catId, text: newQ }) });
     setNewQ(''); loadQs();
-  };
-  const editQ = async (q: Question) => {
+  });
+  const editQ = (q: Question) => guard(async () => {
     const text = prompt('문항 수정', q.text);
     if (!text) return;
     await api(`/questions/${q.id}`, { method: 'PUT', body: JSON.stringify({ text }) });
     loadQs();
-  };
-  const removeQ = async (q: Question) => {
+  });
+  const removeQ = (q: Question) => guard(async () => {
     if (!confirm('문항 삭제?')) return;
     await api(`/questions/${q.id}`, { method: 'DELETE' });
     loadQs();
-  };
+  });
 
   return (
     <div>
+      {err && <p style={{ color: 'red' }}>{err}</p>}
+
       <h2>카테고리 관리</h2>
       <div style={{ display: 'flex', gap: 8 }}>
         <select value={newType} onChange={(e) => setNewType(e.target.value as CategoryType)}>
@@ -129,7 +149,7 @@ export default function SettingsPage() {
       </ul>
 
       <h2>문항 관리</h2>
-      <CategoryPicker value={catId} onChange={setCatId} />
+      <CategoryPicker value={catId} onChange={setCatId} refreshKey={catsRefreshKey} />
       {catId && (
         <>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
