@@ -67,6 +67,37 @@ done
 cd "$DEPLOY_PATH/server"
 npm ci --omit=dev
 
+prepare_better_sqlite3() {
+  local module_dir="$DEPLOY_PATH/server/node_modules/better-sqlite3"
+  local native_binding="$module_dir/build/Release/better_sqlite3.node"
+  local arm64_prebuild="$module_dir/prebuilds/linux-arm64.node"
+
+  if node --input-type=module -e "import Database from 'better-sqlite3'; const db = new Database(':memory:'); db.close();" >/dev/null 2>&1; then
+    return
+  fi
+
+  if [[ "$(uname -m)" != "aarch64" ]]; then
+    echo "better-sqlite3 could not load its native binding outside the supported OCI ARM host" >&2
+    exit 1
+  fi
+
+  echo "Rebuilding better-sqlite3 for the OCI host glibc and ARM runtime."
+  (
+    cd "$module_dir"
+    GYP_DEFINES=force_build=1 npm rebuild better-sqlite3 --foreground-scripts
+  )
+
+  if [[ ! -f "$native_binding" ]]; then
+    echo "better-sqlite3 source build did not produce $native_binding" >&2
+    exit 1
+  fi
+
+  install -m 0755 "$native_binding" "$arm64_prebuild"
+  node --input-type=module -e "import Database from 'better-sqlite3'; const db = new Database(':memory:'); db.close();"
+}
+
+prepare_better_sqlite3
+
 cd "$DEPLOY_PATH/web"
 npm ci
 npm run build

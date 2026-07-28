@@ -61,6 +61,9 @@ test('remote deploy script validates runtime prerequisites and restarts opict', 
   assert.match(deploy, /journalctl --user -u opict/);
   assert.match(deploy, /trap 'on_exit "\$\?"' EXIT/);
   assert.match(deploy, /home\/opc\/\.local\/bin/);
+  assert.match(deploy, /GYP_DEFINES=force_build=1 npm rebuild better-sqlite3/);
+  assert.match(deploy, /build\/Release\/better_sqlite3\.node/);
+  assert.match(deploy, /prebuilds\/linux-arm64\.node/);
 });
 
 test('workflow tests master before deploying and preserves server state during rsync', () => {
