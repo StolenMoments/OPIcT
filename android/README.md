@@ -59,3 +59,9 @@ application ID로 업데이트할 수 없으며, 새 키로 서명한 APK는 기
 - 연습 화면에서 Android 마이크 권한을 허용하고 녹음 흐름을 확인한다.
 - 내부 링크와 뒤로가기 기록, 외부 HTTPS 링크의 기본 브라우저 전환을 확인한다.
 - 네트워크를 끊었을 때 오류/재시도 화면이 표시되고, 복구 후 다시 로드되는지 확인한다.
+
+## GitHub Release APK
+
+저장소 Secrets에 `OPICT_ANDROID_KEYSTORE_BASE64`, `OPICT_ANDROID_STORE_PASSWORD`,
+`OPICT_ANDROID_KEY_PASSWORD`를 등록한 뒤 `Android Release` workflow를 수동 실행한다.
+입력한 tag 이름의 artifact를 내려받아 서명 확인 후 GitHub Release에 첨부한다.
