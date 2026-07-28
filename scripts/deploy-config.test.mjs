@@ -33,6 +33,16 @@ test('nginx config proxies the app with upload and long-request limits', () => {
   assert.match(nginx, /live\/opict\.mygreed\.shop\/privkey\.pem/);
 });
 
+test('HTTP bootstrap nginx config exposes the app before certificate issuance', () => {
+  const nginx = read('deploy/nginx/opict.mygreed.shop.http.conf');
+
+  assert.match(nginx, /listen 80/);
+  assert.match(nginx, /server_name opict\.mygreed\.shop/);
+  assert.match(nginx, /proxy_pass\s+http:\/\/127\.0\.0\.1:3001/);
+  assert.match(nginx, /proxy_read_timeout 300s/);
+  assert.doesNotMatch(nginx, /listen 443/);
+});
+
 test('bootstrap script pins the whisper installation and validates its executable', () => {
   const bootstrap = read('scripts/bootstrap-opict.sh');
 
@@ -95,6 +105,7 @@ test('Linux deployment files use LF line endings', () => {
     'scripts/deploy-remote.sh',
     'deploy/opict.service',
     'deploy/nginx/opict.mygreed.shop.conf',
+    'deploy/nginx/opict.mygreed.shop.http.conf',
     '.github/workflows/deploy.yml',
   ]) {
     assert.doesNotMatch(read(relativePath), /\r/);

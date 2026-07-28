@@ -81,6 +81,14 @@ ssh opc@146.56.170.98 'DEPLOY_PATH=/home/opc/opict bash /home/opc/opict/scripts/
 `146.56.170.98`을 가리키고 HTTP 응답을 확인한 뒤 인증서를 발급한다.
 
 ```bash
+sudo install -m 0644 /home/opc/opict/deploy/nginx/opict.mygreed.shop.http.conf \
+  /etc/nginx/conf.d/opict.mygreed.shop.conf
+sudo nginx -t
+sudo systemctl reload nginx
+curl -fsS http://opict.mygreed.shop/api/health
+```
+
+```bash
 sudo certbot certonly --nginx -d opict.mygreed.shop
 ```
 
