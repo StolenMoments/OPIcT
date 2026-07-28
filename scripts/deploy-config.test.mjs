@@ -41,6 +41,7 @@ test('bootstrap script pins the whisper installation and validates its executabl
   assert.match(bootstrap, /FFMPEG_VERSION="7\.1\.1"/);
   assert.match(bootstrap, /FFMPEG_URL="https:\/\/ffmpeg\.org\/releases\/ffmpeg-\$FFMPEG_VERSION\.tar\.xz"/);
   assert.match(bootstrap, /\.\/configure[\s\S]*make[\s\S]*make install/);
+  assert.match(bootstrap, /command -v cmake[\s\S]*sudo dnf install -y cmake/);
   assert.match(bootstrap, /aarch64/);
   assert.match(bootstrap, /v1\.7\.4/);
   assert.match(bootstrap, /WHISPER_BIN="\$WHISPER_ROOT\/build\/bin\/whisper-cli"/);

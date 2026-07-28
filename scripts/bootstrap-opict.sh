@@ -50,6 +50,10 @@ if ! sudo dnf install -y ffmpeg cmake git gcc-c++ make; then
   fi
 fi
 
+if ! command -v cmake >/dev/null 2>&1; then
+  sudo dnf install -y cmake
+fi
+
 if ! command -v ffmpeg >/dev/null 2>&1; then
   echo "ffmpeg is not available after package/source installation." >&2
   exit 1
