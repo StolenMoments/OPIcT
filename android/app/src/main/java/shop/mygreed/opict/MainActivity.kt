@@ -16,6 +16,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
@@ -49,6 +50,7 @@ class MainActivity : ComponentActivity() {
     private var mainFrameUrl: String? = null
     private var navigationFailed = false
     private var pendingAudioPermissionRequest: PermissionRequest? = null
+    private val microphonePermissionFlow = MicrophonePermissionFlow()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -141,6 +143,7 @@ class MainActivity : ComponentActivity() {
                 setAcceptCookie(true)
                 setAcceptThirdPartyCookies(this@webView, false)
             }
+            addJavascriptInterface(MicrophonePermissionBridge(), "opictAndroid")
             webViewClient = ShellWebViewClient()
             webChromeClient = ShellChromeClient()
         }
@@ -199,6 +202,39 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private inner class MicrophonePermissionBridge {
+        @JavascriptInterface
+        fun requestMicrophonePermission() {
+            runOnUiThread { handleNativeMicrophonePermissionRequest() }
+        }
+    }
+
+    private fun handleNativeMicrophonePermissionRequest() {
+        when (
+            microphonePermissionFlow.begin(
+                checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED,
+            )
+        ) {
+            MicrophonePermissionAction.REQUEST -> {
+                requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), NATIVE_AUDIO_PERMISSION_REQUEST_CODE)
+            }
+            MicrophonePermissionAction.NOTIFY_GRANTED -> notifyMicrophonePermission(granted = true)
+            MicrophonePermissionAction.NOTIFY_DENIED,
+            MicrophonePermissionAction.IGNORE,
+            -> Unit
+        }
+    }
+
+    private fun notifyMicrophonePermission(granted: Boolean) {
+        val currentWebView = webView ?: return
+        currentWebView.post {
+            currentWebView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('opict-microphone-permission', { detail: { granted: $granted } }));",
+                null,
+            )
+        }
+    }
+
     private inner class ShellChromeClient : WebChromeClient() {
         override fun onProgressChanged(view: WebView, newProgress: Int) {
             progress.progress = newProgress
@@ -206,6 +242,16 @@ class MainActivity : ComponentActivity() {
         }
 
         override fun onPermissionRequest(request: PermissionRequest) {
+            runOnUiThread { handleWebViewPermissionRequest(request) }
+        }
+
+        override fun onPermissionRequestCanceled(request: PermissionRequest) {
+            if (pendingAudioPermissionRequest === request) {
+                pendingAudioPermissionRequest = null
+            }
+        }
+
+        private fun handleWebViewPermissionRequest(request: PermissionRequest) {
             if (!WebViewPermissionPolicy.canGrantAudioCapture(request.origin, request.resources)) {
                 request.deny()
                 return
@@ -247,6 +293,16 @@ class MainActivity : ComponentActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == NATIVE_AUDIO_PERMISSION_REQUEST_CODE) {
+            when (microphonePermissionFlow.finish(grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)) {
+                MicrophonePermissionAction.NOTIFY_GRANTED -> notifyMicrophonePermission(granted = true)
+                MicrophonePermissionAction.NOTIFY_DENIED -> notifyMicrophonePermission(granted = false)
+                MicrophonePermissionAction.REQUEST,
+                MicrophonePermissionAction.IGNORE,
+                -> Unit
+            }
+            return
+        }
         if (requestCode != AUDIO_PERMISSION_REQUEST_CODE) return
 
         val request = pendingAudioPermissionRequest
@@ -323,6 +379,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        microphonePermissionFlow.cancel()
         pendingAudioPermissionRequest?.deny()
         pendingAudioPermissionRequest = null
         webView?.let(::disposeWebView)
@@ -339,5 +396,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val START_URL = "https://opict.mygreed.shop/"
         private const val AUDIO_PERMISSION_REQUEST_CODE = 4101
+        private const val NATIVE_AUDIO_PERMISSION_REQUEST_CODE = 4102
     }
 }

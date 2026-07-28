@@ -6,7 +6,7 @@ on:
       tag:
         description: GitHub Release tag to use for the downloaded APK
         required: true
-        default: opict-android-v1.0.0
+        default: opict-android-v1.0.1
         type: string
 
 permissions:

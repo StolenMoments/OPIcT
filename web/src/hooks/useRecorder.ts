@@ -1,5 +1,38 @@
 import { useEffect, useRef, useState } from 'react';
 
+const NATIVE_PERMISSION_RESULT_EVENT = 'opict-microphone-permission';
+
+type NativeMicrophoneBridge = {
+  requestMicrophonePermission: () => void;
+};
+
+declare global {
+  interface Window {
+    opictAndroid?: NativeMicrophoneBridge;
+  }
+}
+
+export function requestNativeMicrophonePermission(): Promise<boolean> {
+  if (typeof window === 'undefined' || !window.opictAndroid?.requestMicrophonePermission) {
+    return Promise.resolve(true);
+  }
+
+  return new Promise((resolve) => {
+    const onResult = (event: Event) => {
+      window.removeEventListener(NATIVE_PERMISSION_RESULT_EVENT, onResult);
+      const granted = (event as CustomEvent<{ granted?: boolean }>).detail?.granted === true;
+      resolve(granted);
+    };
+    window.addEventListener(NATIVE_PERMISSION_RESULT_EVENT, onResult);
+    try {
+      window.opictAndroid?.requestMicrophonePermission();
+    } catch {
+      window.removeEventListener(NATIVE_PERMISSION_RESULT_EVENT, onResult);
+      resolve(false);
+    }
+  });
+}
+
 // Preference order: opus in webm is the best-supported combo across desktop
 // Chrome/Firefox/Edge; ogg/opus and plain webm are fallbacks for browsers
 // that support MediaRecorder but not that exact mime string.
@@ -45,6 +78,10 @@ export function useRecorder() {
     }
 
     let stream: MediaStream;
+    if (!(await requestNativeMicrophonePermission())) {
+      setError('마이크 사용 권한이 필요합니다.');
+      throw new Error('microphone permission denied');
+    }
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
