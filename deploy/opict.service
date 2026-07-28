@@ -1,0 +1,18 @@
+[Unit]
+Description=OPIc Personal Trainer server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/opc/opict/server
+ExecStart=/usr/bin/node src/server.js
+Restart=on-failure
+RestartSec=5
+EnvironmentFile=/home/opc/opict/.env
+Environment=NODE_ENV=production
+Environment=PORT=3001
+Environment=HOST=127.0.0.1
+Environment=PATH=/home/opc/.local/bin:/home/opc/tools/whisper.cpp/build/bin:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=default.target
