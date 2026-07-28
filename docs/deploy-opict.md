@@ -71,8 +71,10 @@ ssh opc@146.56.170.98 'DEPLOY_PATH=/home/opc/opict bash /home/opc/opict/scripts/
 ```
 
 스크립트는 `.env`, Whisper 바이너리·모델, `claude`·`codex`·`agy`를 확인하고,
-서버 아키텍처에 맞게 `npm ci`와 웹 빌드를 수행한 뒤 user systemd unit을
-설치·재시작한다. 실패하면 서비스 상태와 최근 journal을 출력한다.
+서버 아키텍처에 맞게 `npm ci`와 웹 빌드를 수행한다. OCI Oracle Linux
+aarch64에서 사전 빌드된 `better-sqlite3`가 호스트 glibc와 맞지 않으면 자동으로
+소스 빌드해 설치한 뒤 user systemd unit을 재시작한다. 실패하면 서비스 상태와
+최근 journal을 출력한다.
 
 ## Nginx와 HTTPS
 
