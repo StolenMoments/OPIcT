@@ -12,6 +12,11 @@
   gap: var(--s-3);
 }
 
+.section--compact {
+  padding-bottom: var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+
 .section__title {
   font-size: var(--t-lg);
 }
@@ -21,6 +26,16 @@
   gap: var(--s-2);
   align-items: flex-start;
   flex-wrap: wrap;
+}
+
+.section__row--between {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section__hint {
+  color: var(--ink-muted);
+  font-size: var(--t-sm);
 }
 
 .section__row > * {

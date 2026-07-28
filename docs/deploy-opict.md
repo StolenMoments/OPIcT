@@ -25,6 +25,18 @@ OPICT_WHISPER_MODEL=/home/opc/tools/whisper.cpp/models/ggml-base.en.bin
 TZ=Asia/Seoul
 ```
 
+초기 접속 비밀번호와 세션 비밀키는 저장소나 GitHub Secrets에 넣지 않는다. 소스가
+전달된 뒤 다음 명령을 한 번만 실행하면 임의의 초기 비밀번호를 생성하고 해시·세션
+비밀키만 `.env`에 저장한다. 명령 출력의 비밀번호를 안전한 곳에 보관한다.
+
+```bash
+cd /home/opc/opict
+node scripts/init-opict-auth.mjs --env /home/opc/opict/.env
+```
+
+이미 인증 키가 있는 `.env`는 덮어쓰지 않으므로, 출력된 초기 비밀번호를 잊은
+경우에는 별도 비밀번호 재설정 절차를 수행해야 한다.
+
 소스가 서버에 전달된 뒤 Whisper와 오디오 의존성을 한 번 준비한다.
 
 ```bash

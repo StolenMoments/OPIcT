@@ -6,6 +6,52 @@
   flex-direction: column;
 }
 
+.auth-screen {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: var(--s-5) var(--s-4);
+}
+
+.auth-screen__panel {
+  width: min(100%, 24rem);
+  display: grid;
+  gap: var(--s-5);
+  padding: var(--s-6);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+
+.auth-screen__intro {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.auth-screen__brand {
+  color: var(--accent);
+  font-size: var(--t-sm);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.auth-screen__intro h1 {
+  font-size: var(--t-xl);
+}
+
+.auth-screen__intro p {
+  color: var(--ink-muted);
+  font-size: var(--t-sm);
+}
+
+.auth-screen__submit {
+  width: 100%;
+}
+
+.auth-screen__checking {
+  color: var(--ink-muted);
+}
+
 .app__header {
   position: sticky;
   top: 0;

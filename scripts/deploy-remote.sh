@@ -41,6 +41,17 @@ read_env_value() {
 
 whisper_bin="$(read_env_value OPICT_WHISPER_BIN)"
 whisper_model="$(read_env_value OPICT_WHISPER_MODEL)"
+app_password_hash="$(read_env_value OPICT_APP_PASSWORD_HASH)"
+session_secret="$(read_env_value OPICT_SESSION_SECRET)"
+
+if [[ -z "$app_password_hash" || "$app_password_hash" != scrypt\$* ]]; then
+  echo "Missing or invalid OPICT_APP_PASSWORD_HASH in .env" >&2
+  exit 1
+fi
+if [[ ${#session_secret} -lt 32 ]]; then
+  echo "Missing or invalid OPICT_SESSION_SECRET in .env" >&2
+  exit 1
+fi
 
 if [[ -z "$whisper_bin" || ! -x "$whisper_bin" ]]; then
   echo "Missing executable OPICT_WHISPER_BIN: ${whisper_bin:-<unset>}" >&2

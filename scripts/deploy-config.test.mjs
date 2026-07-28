@@ -16,6 +16,7 @@ test('systemd unit pins the production runtime contract', () => {
   assert.match(service, /WorkingDirectory=\/home\/opc\/opict\/server/);
   assert.match(service, /ExecStart=\/usr\/bin\/node src\/server\.js/);
   assert.match(service, /EnvironmentFile=\/home\/opc\/opict\/\.env/);
+  assert.match(service, /Environment=NODE_ENV=production/);
   assert.match(service, /Environment=PORT=3001/);
   assert.match(service, /Environment=HOST=127\.0\.0\.1/);
   assert.match(service, /whisper\.cpp\/build\/bin/);
@@ -68,6 +69,9 @@ test('remote deploy script validates runtime prerequisites and restarts opict', 
   assert.match(deploy, /systemctl --user enable opict/);
   assert.match(deploy, /systemctl --user restart opict/);
   assert.match(deploy, /127\.0\.0\.1:3001\/api\/health/);
+  assert.match(deploy, /OPICT_APP_PASSWORD_HASH/);
+  assert.match(deploy, /OPICT_SESSION_SECRET/);
+  assert.match(deploy, /invalid OPICT_APP_PASSWORD_HASH/);
   assert.match(deploy, /journalctl --user -u opict/);
   assert.match(deploy, /trap 'on_exit "\$\?"' EXIT/);
   assert.match(deploy, /home\/opc\/\.local\/bin/);
@@ -96,6 +100,8 @@ test('environment example documents the production whisper paths and timezone', 
 
   assert.match(envExample, /OPICT_WHISPER_BIN=\/home\/opc\/tools\/whisper\.cpp\/build\/bin\/whisper-cli/);
   assert.match(envExample, /OPICT_WHISPER_MODEL=\/home\/opc\/tools\/whisper\.cpp\/models\/ggml-base\.en\.bin/);
+  assert.match(envExample, /OPICT_APP_PASSWORD_HASH=scrypt\$<generate-on-server>/);
+  assert.match(envExample, /OPICT_SESSION_SECRET=<generate-on-server>/);
   assert.match(envExample, /TZ=Asia\/Seoul/);
 });
 

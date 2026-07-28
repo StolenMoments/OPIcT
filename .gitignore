@@ -8,4 +8,11 @@
 node_modules
 server/data/
 web/dist/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/keystore.properties
+android/keystore/
+*.jks
 *.tsbuildinfo

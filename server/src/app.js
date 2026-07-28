@@ -13,11 +13,18 @@ import { settingsRoutes } from './routes/settings.js';
 import { metaRoutes } from './routes/meta.js';
 import { attemptsRoutes } from './routes/attempts.js';
 import { retryRoutes } from './routes/retry.js';
+import { authRoutes } from './routes/auth.js';
+import { registerAuthHook, resolveAuthConfig } from './auth/auth-plugin.js';
 
-export async function buildApp({ dbFile = 'data/opict.db', logger = false } = {}) {
-  const app = Fastify({ logger });
+export async function buildApp({ dbFile = 'data/opict.db', logger = false, auth } = {}) {
+  const authConfig = auth === undefined
+    ? (process.env.NODE_ENV === 'production' ? resolveAuthConfig() : null)
+    : resolveAuthConfig(auth);
+  const app = Fastify({ logger, trustProxy: ['127.0.0.1', '::1'] });
   app.decorate('repos', createRepos(createDb(dbFile)));
+  registerAuthHook(app, authConfig);
   app.get('/api/health', async () => ({ ok: true }));
+  await authRoutes(app, { auth: authConfig });
   await app.register(fastifyMultipart, { limits: { fileSize: 50 * 1024 * 1024 } });
   await app.register(categoriesRoutes);
   await app.register(questionsRoutes);

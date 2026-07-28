@@ -9,7 +9,7 @@ import EmptyState from '../components/ui/EmptyState';
 import Skeleton from '../components/ui/Skeleton';
 import type { Category, CategoryType, Question } from '../types';
 
-export default function SettingsPage() {
+export default function SettingsPage({ onLogout }: { onLogout: () => void }) {
   const [err, setErr] = useState<string | null>(null);
   const guard = useCallback(async (fn: () => Promise<void>) => {
     try {
@@ -148,6 +148,17 @@ export default function SettingsPage() {
 
   return (
     <div className="page">
+      <div className="section section--compact">
+        <div className="section__row section__row--between">
+          <div>
+            <h2 className="section__title">접속</h2>
+            <p className="section__hint">이 기기의 세션을 종료합니다.</p>
+          </div>
+          <Button variant="ghost" onClick={async () => { await api('/auth/logout', { method: 'POST' }); onLogout(); }}>
+            로그아웃
+          </Button>
+        </div>
+      </div>
       {err && <ErrorBanner message={err} onDismiss={() => setErr(null)} />}
 
       <div className="section">
