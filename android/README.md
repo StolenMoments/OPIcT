@@ -1,7 +1,7 @@
 # OPIcT Android 앱
 
 `https://opict.mygreed.shop/`을 표시하는 개인 설치용 Android WebView 앱이다. 운영
-사이트의 초기 비밀번호 화면은 WebView 쿠키에 세션이 저장되는 동안 유지된다.
+사이트의 초기 비밀번호 화면은 WebView 쿠키에 1년 세션이 저장되는 동안 유지된다.
 
 ## 요구 도구
 
