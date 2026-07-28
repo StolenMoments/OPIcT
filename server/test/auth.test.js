@@ -62,6 +62,7 @@ test('login sets a secure session cookie and permits protected API access', asyn
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /Secure/);
   assert.match(cookie, /SameSite=Lax/);
+  assert.match(cookie, /Max-Age=31536000/);
   assert.equal(categories.statusCode, 200);
 });
 

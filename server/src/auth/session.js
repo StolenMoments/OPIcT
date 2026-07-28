@@ -1,7 +1,8 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 export const SESSION_COOKIE = 'opict_session';
-export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+export const SESSION_TTL_SECONDS = SESSION_TTL_MS / 1000;
 
 function signature(secret, expiresAt) {
   return createHmac('sha256', secret).update(String(expiresAt)).digest('hex');

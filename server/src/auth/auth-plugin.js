@@ -1,4 +1,4 @@
-import { SESSION_COOKIE, createSessionToken, verifySessionToken } from './session.js';
+import { SESSION_COOKIE, SESSION_TTL_SECONDS, createSessionToken, verifySessionToken } from './session.js';
 
 const PUBLIC_API_PATHS = new Set(['/api/health', '/api/auth/login', '/api/auth/session']);
 
@@ -36,7 +36,7 @@ export function requestIsAuthenticated(request, auth) {
 }
 
 export function setSessionCookie(reply, token) {
-  reply.header('set-cookie', `${SESSION_COOKIE}=${encodeURIComponent(token)}; Max-Age=2592000; Path=/; HttpOnly; Secure; SameSite=Lax`);
+  reply.header('set-cookie', `${SESSION_COOKIE}=${encodeURIComponent(token)}; Max-Age=${SESSION_TTL_SECONDS}; Path=/; HttpOnly; Secure; SameSite=Lax`);
 }
 
 export function clearSessionCookie(reply) {
