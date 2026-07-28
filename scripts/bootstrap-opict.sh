@@ -11,7 +11,10 @@ if [[ "$(uname -m)" != "aarch64" ]]; then
   exit 1
 fi
 
-sudo dnf install -y ffmpeg cmake git gcc-c++ make
+if ! sudo dnf install -y ffmpeg cmake git gcc-c++ make; then
+  echo "ffmpeg is unavailable in the configured repositories; trying Oracle Linux's ffmpeg-free package."
+  sudo dnf install -y ffmpeg-free cmake git gcc-c++ make
+fi
 
 if [[ -x "$WHISPER_BIN" && -f "$WHISPER_MODEL" ]]; then
   echo "Existing whisper.cpp binary and model found; preserving installation."

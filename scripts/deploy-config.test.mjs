@@ -37,6 +37,7 @@ test('bootstrap script pins the whisper installation and validates its executabl
   const bootstrap = read('scripts/bootstrap-opict.sh');
 
   assert.match(bootstrap, /sudo dnf install -y ffmpeg cmake/);
+  assert.match(bootstrap, /ffmpeg-free/);
   assert.match(bootstrap, /aarch64/);
   assert.match(bootstrap, /v1\.7\.4/);
   assert.match(bootstrap, /WHISPER_BIN="\$WHISPER_ROOT\/build\/bin\/whisper-cli"/);
