@@ -80,3 +80,15 @@ test('environment example documents the production whisper paths and timezone', 
   assert.match(envExample, /OPICT_WHISPER_MODEL=\/home\/opc\/tools\/whisper\.cpp\/models\/ggml-base\.en\.bin/);
   assert.match(envExample, /TZ=Asia\/Seoul/);
 });
+
+test('Linux deployment files use LF line endings', () => {
+  for (const relativePath of [
+    'scripts/bootstrap-opict.sh',
+    'scripts/deploy-remote.sh',
+    'deploy/opict.service',
+    'deploy/nginx/opict.mygreed.shop.conf',
+    '.github/workflows/deploy.yml',
+  ]) {
+    assert.doesNotMatch(read(relativePath), /\r/);
+  }
+});
