@@ -4,6 +4,7 @@ const NATIVE_PERMISSION_RESULT_EVENT = 'opict-microphone-permission';
 
 type NativeMicrophoneBridge = {
   requestMicrophonePermission: () => void;
+  setTheme?: (dark: boolean) => void;
 };
 
 declare global {

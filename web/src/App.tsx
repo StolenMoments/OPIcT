@@ -1,85 +1,150 @@
-import { useEffect, useState } from 'react';
-import { api } from './api';
-import PracticePage from './pages/PracticePage';
-import CorrectPage from './pages/CorrectPage';
-import NotesPage from './pages/NotesPage';
-import HistoryPage from './pages/HistoryPage';
-import SettingsPage from './pages/SettingsPage';
-import LoginScreen from './components/LoginScreen';
-import './App.css';
+import { useEffect, useState } from "react";
+import {
+  BookOpenText,
+  History,
+  Mic2,
+  Radio,
+  Settings,
+  Sparkles,
+  Wifi,
+  WifiOff,
+} from "lucide-react";
+import { api } from "./api";
+import PracticePage from "./pages/PracticePage";
+import CorrectPage from "./pages/CorrectPage";
+import NotesPage from "./pages/NotesPage";
+import HistoryPage from "./pages/HistoryPage";
+import SettingsPage from "./pages/SettingsPage";
+import LoginScreen from "./components/LoginScreen";
+import { ThemeProvider } from "./components/theme-provider";
+import { Toaster } from "./components/ui/sonner";
 
-type SessionState = 'checking' | 'authenticated' | 'unauthenticated';
+type SessionState = "checking" | "authenticated" | "unauthenticated";
+export type TabKey = "practice" | "correct" | "notes" | "history" | "settings";
+
+const TABS = [
+  { key: "practice", label: "연습", icon: Mic2 },
+  { key: "correct", label: "교정", icon: Sparkles },
+  { key: "notes", label: "노트", icon: BookOpenText },
+  { key: "history", label: "기록", icon: History },
+  { key: "settings", label: "설정", icon: Settings },
+] as const satisfies ReadonlyArray<{
+  key: TabKey;
+  label: string;
+  icon: typeof Mic2;
+}>;
 
 export default function App() {
-  const [session, setSession] = useState<SessionState>('checking');
+  return (
+    <ThemeProvider>
+      <AppContent />
+      <Toaster position="top-center" />
+    </ThemeProvider>
+  );
+}
+
+function AppContent() {
+  const [session, setSession] = useState<SessionState>("checking");
 
   useEffect(() => {
-    api<{ authenticated: boolean }>('/auth/session')
-      .then(({ authenticated }) => setSession(authenticated ? 'authenticated' : 'unauthenticated'))
-      .catch(() => setSession('unauthenticated'));
+    api<{ authenticated: boolean }>("/auth/session")
+      .then(({ authenticated }) =>
+        setSession(authenticated ? "authenticated" : "unauthenticated"),
+      )
+      .catch(() => setSession("unauthenticated"));
   }, []);
 
-  if (session === 'checking') {
-    return <main className="auth-screen" aria-live="polite"><p className="auth-screen__checking">접속 확인 중...</p></main>;
-  }
-  if (session === 'unauthenticated') {
+  if (session === "checking")
+    return (
+      <main className="auth-screen auth-screen--checking" aria-live="polite">
+        <div className="auth-screen__panel auth-screen__panel--checking">
+          <Radio className="auth-screen__signal" aria-hidden="true" />
+          <p>접속 확인 중...</p>
+        </div>
+      </main>
+    );
+  if (session === "unauthenticated")
     return (
       <LoginScreen
         onLogin={async (password) => {
-          await api('/auth/login', { method: 'POST', body: JSON.stringify({ password }) });
-          setSession('authenticated');
+          await api("/auth/login", {
+            method: "POST",
+            body: JSON.stringify({ password }),
+          });
+          setSession("authenticated");
         }}
       />
     );
-  }
-  return <AuthenticatedApp onLogout={() => setSession('unauthenticated')} />;
+  return <AuthenticatedApp onLogout={() => setSession("unauthenticated")} />;
 }
 
 function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
-  const [tab, setTab] = useState<string>('practice');
+  const [tab, setTab] = useState<TabKey>("practice");
   const [online, setOnline] = useState<boolean | null>(null);
 
-  const tabs = [
-    { key: 'practice', label: '연습', el: <PracticePage /> },
-    { key: 'correct', label: '교정', el: <CorrectPage /> },
-    { key: 'notes', label: '노트', el: <NotesPage /> },
-    { key: 'history', label: '기록', el: <HistoryPage /> },
-    { key: 'settings', label: '설정', el: <SettingsPage onLogout={onLogout} /> },
-  ] as const;
-
   useEffect(() => {
-    api<{ ok: boolean }>('/health')
-      .then((r) => setOnline(r.ok))
+    api<{ ok: boolean }>("/health")
+      .then((response) => setOnline(response.ok))
       .catch(() => setOnline(false));
   }, []);
 
-  const statusLabel = online == null ? '확인 중' : online ? '서버 연결됨' : '서버 연결 안 됨';
-  const statusDotClass = online == null ? '' : online ? 'app__status-dot--online' : 'app__status-dot--offline';
-
+  const statusLabel =
+    online == null
+      ? "회선 확인 중"
+      : online
+        ? "스튜디오 연결됨"
+        : "스튜디오 연결 끊김";
+  const StatusIcon = online === false ? WifiOff : Wifi;
   return (
-    <div className="app">
-      <header className="app__header">
-        <span className="app__brand">OPIcT</span>
-        <span className="app__status" role="status" aria-live="polite">
-          <span className={`app__status-dot ${statusDotClass}`} aria-hidden="true" />
-          {statusLabel}
-        </span>
-      </header>
-
-      <main className="app__main">{tabs.find((t) => t.key === tab)!.el}</main>
-
-      <nav className="app__tabbar" aria-label="주요 화면 전환">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            className={`app__tab ${t.key === tab ? 'app__tab--active' : ''}`}
-            aria-current={t.key === tab ? 'page' : undefined}
-            onClick={() => setTab(t.key)}
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="app-header__inner">
+          <span className="app-brand">
+            <Radio aria-hidden="true" /> OPIcT
+          </span>
+          <span
+            className={`connection-status connection-status--${online == null ? "checking" : online ? "online" : "offline"}`}
+            role="status"
+            aria-live="polite"
           >
-            {t.label}
-          </button>
-        ))}
+            <StatusIcon aria-hidden="true" />
+            {statusLabel}
+          </span>
+        </div>
+      </header>
+      <main className="app-main">
+        <div hidden={tab !== "practice"}>
+          <PracticePage />
+        </div>
+        <div hidden={tab !== "correct"}>
+          <CorrectPage />
+        </div>
+        <div hidden={tab !== "notes"}>
+          <NotesPage />
+        </div>
+        <div hidden={tab !== "history"}>
+          <HistoryPage />
+        </div>
+        <div hidden={tab !== "settings"}>
+          <SettingsPage onLogout={onLogout} />
+        </div>
+      </main>
+      <nav className="bottom-nav" aria-label="주요 화면 전환">
+        <div className="bottom-nav__inner">
+          {TABS.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              type="button"
+              className="bottom-nav__item"
+              data-active={key === tab}
+              aria-current={key === tab ? "page" : undefined}
+              onClick={() => setTab(key)}
+            >
+              <Icon aria-hidden="true" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
       </nav>
     </div>
   );

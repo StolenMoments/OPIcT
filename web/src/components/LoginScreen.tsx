@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import Button from './ui/Button';
-import Field from './ui/Field';
+import { Radio } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 
 export default function LoginScreen({ onLogin }: { onLogin: (password: string) => Promise<void> }) {
   const [password, setPassword] = useState('');
@@ -25,22 +28,27 @@ export default function LoginScreen({ onLogin }: { onLogin: (password: string) =
     <main className="auth-screen">
       <form className="auth-screen__panel" onSubmit={submit}>
         <div className="auth-screen__intro">
-          <span className="auth-screen__brand">OPIcT</span>
-          <h1>다시 연습을 시작하세요</h1>
-          <p>개인 학습 공간에 들어가려면 비밀번호를 입력하세요.</p>
+          <span className="auth-screen__brand">
+            <Radio aria-hidden="true" /> OPIcT
+          </span>
+          <h1>방송 부스에 입장하세요</h1>
+          <p>개인 연습 신호를 이어가려면 비밀번호를 입력하세요.</p>
         </div>
-        <Field label="비밀번호" htmlFor="opict-password" error={error}>
-          <input
+        <Field data-invalid={Boolean(error)}>
+          <FieldLabel htmlFor="opict-password">비밀번호</FieldLabel>
+          <Input
             id="opict-password"
-            className="input"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="current-password"
             autoFocus
+            aria-invalid={Boolean(error)}
           />
+          <FieldError>{error}</FieldError>
         </Field>
-        <Button type="submit" variant="primary" className="auth-screen__submit" loading={pending} disabled={!password}>
+        <Button type="submit" className="auth-screen__submit" disabled={!password || pending} aria-busy={pending}>
+          {pending && <Spinner aria-label="로그인 처리 중" />}
           로그인
         </Button>
       </form>

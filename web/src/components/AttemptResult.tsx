@@ -1,7 +1,6 @@
-import ErrorBanner from './ui/ErrorBanner';
-import StatusPill from './ui/StatusPill';
+import ErrorAlert from './ui/ErrorAlert';
+import StatusBadge from './ui/StatusBadge';
 import type { Attempt, EvalResult } from '../types';
-import './AttemptResult.css';
 
 const PIPELINE = [
   { key: 'uploaded', label: '업로드' },
@@ -48,8 +47,8 @@ function pillStatusFor(rowStatus: string, stageKey: string): 'pending' | 'runnin
 export default function AttemptResult({ row }: { row: Attempt }) {
   if (row.status === 'error') {
     return (
-      <div className="section" aria-live="polite">
-        <ErrorBanner message={row.error_message ?? '평가 중 오류가 발생했습니다.'} />
+      <div className="attempt-result" aria-live="polite">
+        <ErrorAlert message={row.error_message ?? '평가 중 오류가 발생했습니다.'} />
         {row.raw_output && (
           <details className="raw-output">
             <summary>원문 보기</summary>
@@ -66,7 +65,7 @@ export default function AttemptResult({ row }: { row: Attempt }) {
         {PIPELINE.map((stage) => (
           <span key={stage.key} className="attempt-pipeline__stage">
             <span className="attempt-pipeline__stage-label">{stage.label}</span>
-            <StatusPill status={pillStatusFor(row.status, stage.key)} />
+            <StatusBadge status={pillStatusFor(row.status, stage.key)} />
           </span>
         ))}
         <span className="attempt-pipeline__label">{STATUS_KO[row.status] ?? row.status}…</span>
@@ -77,8 +76,8 @@ export default function AttemptResult({ row }: { row: Attempt }) {
   const result = safeParseResult(row.result_json);
   if (!result) {
     return (
-      <div className="section" aria-live="polite">
-        <ErrorBanner message="결과를 표시할 수 없습니다." />
+      <div className="attempt-result" aria-live="polite">
+        <ErrorAlert message="결과를 표시할 수 없습니다." />
         {row.raw_output && (
           <details className="raw-output">
             <summary>원문 보기</summary>
@@ -90,7 +89,7 @@ export default function AttemptResult({ row }: { row: Attempt }) {
   }
 
   return (
-    <div className="section" aria-live="polite">
+    <div className="attempt-result" aria-live="polite">
       {row.transcript && (
         <div>
           <h3>내 답변 (전사)</h3>

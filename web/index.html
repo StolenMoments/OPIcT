@@ -5,7 +5,20 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#e2883f" />
+    <meta name="theme-color" content="#221d19" />
+    <script>
+      (() => {
+        try {
+          const stored = localStorage.getItem('opict-theme');
+          const theme = stored === 'light' || stored === 'system' || stored === 'dark' ? stored : 'dark';
+          const resolved = theme === 'system' && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : theme === 'light' ? 'light' : 'dark';
+          document.documentElement.classList.add(resolved);
+          document.documentElement.style.colorScheme = resolved;
+        } catch {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
     <title>OPIcT</title>
   </head>
   <body>
