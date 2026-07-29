@@ -123,3 +123,56 @@ test('POST /api/attempts rejects model outside cli allowlist with 400', async (t
   const res = await app.inject({ method: 'POST', url: '/api/attempts', body: form });
   assert.equal(res.statusCode, 400);
 });
+
+test('POST /api/attempts with a JSON body skips STT and evaluates the typed script directly', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const cat = (await app.inject({ method: 'POST', url: '/api/categories', payload: { type: 'survey', name: '여행' } })).json();
+  const q = (await app.inject({ method: 'POST', url: '/api/questions', payload: { category_id: cat.id, text: 'Tell me about your last trip.' } })).json();
+
+  const scriptText = 'I visited Busan last summer and it was great.';
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/attempts',
+    payload: { question_id: q.id, script_text: scriptText, cli: 'claude', model: 'claude-haiku-4-5-20251001' },
+  });
+  assert.equal(res.statusCode, 202);
+
+  const row = await waitDone(app, `/api/attempts/${res.json().id}`);
+  assert.equal(row.status, 'done');
+  assert.equal(row.input_mode, 'text');
+  assert.equal(row.audio_path, null);
+  // STT 스텁은 항상 다른 고정 문장을 반환하므로, transcript가 입력한 스크립트 그대로면
+  // 텍스트 모드가 STT를 건너뛰었다는 뜻이다.
+  assert.equal(row.transcript, scriptText);
+  assert.ok(JSON.parse(row.result_json));
+
+  const audio = await app.inject({ url: `/api/attempts/${row.id}/audio` });
+  assert.equal(audio.statusCode, 404);
+});
+
+test('POST /api/attempts with a JSON body rejects blank script_text with 400', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const cat = (await app.inject({ method: 'POST', url: '/api/categories', payload: { type: 'survey', name: '여행' } })).json();
+  const q = (await app.inject({ method: 'POST', url: '/api/questions', payload: { category_id: cat.id, text: 'Tell me about your last trip.' } })).json();
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/attempts',
+    payload: { question_id: q.id, script_text: '   ', cli: 'claude', model: 'claude-haiku-4-5-20251001' },
+  });
+  assert.equal(res.statusCode, 400);
+});
+
+test('POST /api/attempts with a JSON body rejects a missing question_id with 400', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/attempts',
+    payload: { script_text: 'hello', cli: 'claude', model: 'claude-haiku-4-5-20251001' },
+  });
+  assert.equal(res.statusCode, 400);
+});

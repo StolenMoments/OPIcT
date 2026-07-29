@@ -2,11 +2,16 @@ import ErrorAlert from './ui/ErrorAlert';
 import StatusBadge from './ui/StatusBadge';
 import type { Attempt, EvalResult } from '../types';
 
-const PIPELINE = [
+const PIPELINE_AUDIO = [
   { key: 'uploaded', label: '업로드' },
   { key: 'transcribing', label: '전사' },
   { key: 'evaluating', label: '평가' },
 ] as const;
+
+// 텍스트로 입력한 시도는 업로드·전사 단계 없이 바로 평가로 시작하므로 그 두 단계를 생략한다.
+const PIPELINE_TEXT = [{ key: 'evaluating', label: '평가' }] as const;
+
+type PipelineStage = { key: string; label: string };
 
 const STATUS_KO: Record<string, string> = {
   uploaded: '대기 중',
@@ -36,9 +41,9 @@ function safeParseResult(json: string | null): EvalResult | null {
 // current status (when it's still in progress) is "running"; later stages
 // are "pending". This turns the status field into a readable sequence
 // instead of a single generic spinner.
-function pillStatusFor(rowStatus: string, stageKey: string): 'pending' | 'running' | 'done' {
-  const stageIdx = PIPELINE.findIndex((p) => p.key === stageKey);
-  const rowIdx = PIPELINE.findIndex((p) => p.key === rowStatus);
+function pillStatusFor(rowStatus: string, stageKey: string, pipeline: readonly PipelineStage[]): 'pending' | 'running' | 'done' {
+  const stageIdx = pipeline.findIndex((p) => p.key === stageKey);
+  const rowIdx = pipeline.findIndex((p) => p.key === rowStatus);
   if (rowStatus === 'done' || rowIdx > stageIdx) return 'done';
   if (rowIdx === stageIdx) return 'running';
   return 'pending';
@@ -60,12 +65,13 @@ export default function AttemptResult({ row }: { row: Attempt }) {
   }
 
   if (row.status !== 'done') {
+    const pipeline = row.input_mode === 'text' ? PIPELINE_TEXT : PIPELINE_AUDIO;
     return (
       <div className="attempt-pipeline" aria-live="polite">
-        {PIPELINE.map((stage) => (
+        {pipeline.map((stage) => (
           <span key={stage.key} className="attempt-pipeline__stage">
             <span className="attempt-pipeline__stage-label">{stage.label}</span>
-            <StatusBadge status={pillStatusFor(row.status, stage.key)} />
+            <StatusBadge status={pillStatusFor(row.status, stage.key, pipeline)} />
           </span>
         ))}
         <span className="attempt-pipeline__label">{STATUS_KO[row.status] ?? row.status}…</span>

@@ -15,6 +15,23 @@ export async function attemptsRoutes(app) {
   const repos = app.repos;
 
   app.post('/api/attempts', async (req, reply) => {
+    if (!req.isMultipart()) {
+      const body = req.body ?? {};
+      const scriptText = typeof body.script_text === 'string' ? body.script_text.trim() : '';
+      const s = repos.settings.getAll();
+      const cli = body.cli || s.default_cli;
+      const model = body.model || (CLIS[cli] ? s[`default_model_${cli}`] : undefined);
+      const question = body.question_id && repos.questions.get(body.question_id);
+      if (!scriptText || !question || !CLIS[cli] || !model || !CLIS[cli].models.includes(model)) {
+        return reply.code(400).send({ error: 'script_text, 유효한 question_id, cli/model(또는 기본값 설정)이 필요합니다' });
+      }
+      const row = repos.attempts.create({
+        question_id: question.id, input_mode: 'text', transcript: scriptText, status: 'evaluating', cli, model,
+      });
+      enqueue(() => runAttempt(repos, row.id));
+      return reply.code(202).send({ id: row.id });
+    }
+
     const parts = req.parts();
     const fields = {};
     let audioPath = null;

@@ -68,6 +68,34 @@ test('attempt retry reruns the same record and serves its audio', async (t) => {
   assert.equal((await app.inject({ url: '/api/attempts' })).json().length, 1);
 });
 
+test('text-mode attempt retry resets to evaluating (not uploaded) and reruns with the same script', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const category = (await app.inject({ method: 'POST', url: '/api/categories', payload: { type: 'survey', name: '여행' } })).json();
+  const question = (await app.inject({ method: 'POST', url: '/api/questions',
+    payload: { category_id: category.id, text: 'Tell me about your last trip.' } })).json();
+
+  const scriptText = 'I visited Busan last summer.';
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/attempts',
+    payload: { question_id: question.id, script_text: scriptText, cli: 'claude', model: 'claude-haiku-4-5-20251001' },
+  });
+  assert.equal(created.statusCode, 202);
+  const id = created.json().id;
+  const completed = await waitDone(app, `/api/attempts/${id}`);
+  assert.equal(completed.status, 'done');
+
+  const retry = await app.inject({ method: 'POST', url: `/api/attempts/${id}/retry` });
+  assert.equal(retry.statusCode, 202);
+  const justAfterRetry = (await app.inject({ url: `/api/attempts/${id}` })).json();
+  assert.notEqual(justAfterRetry.status, 'uploaded');
+
+  const retried = await waitDone(app, `/api/attempts/${id}`);
+  assert.equal(retried.status, 'done');
+  assert.equal(retried.transcript, scriptText);
+});
+
 test('retry and audio routes return 404 for missing records', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());

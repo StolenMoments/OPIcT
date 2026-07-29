@@ -153,7 +153,7 @@ function HistoryRow({
         </CollapsibleTrigger>
 
         <CollapsibleContent id={detailId} className="history-entry__detail">
-          {attempt && (
+          {attempt && row.audio_path && (
             <audio
               className="history-entry__audio"
               controls

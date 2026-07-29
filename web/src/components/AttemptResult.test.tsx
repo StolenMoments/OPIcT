@@ -8,6 +8,7 @@ const base = {
   id: 1,
   question_id: 1,
   audio_path: 'x',
+  input_mode: 'audio',
   cli: 'claude',
   model: 'm',
   created_at: '',

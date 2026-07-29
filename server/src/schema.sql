@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS questions (
 CREATE TABLE IF NOT EXISTS attempts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
-  audio_path TEXT NOT NULL,
+  audio_path TEXT,
+  input_mode TEXT NOT NULL DEFAULT 'audio' CHECK (input_mode IN ('audio','text')),
   transcript TEXT,
   cli TEXT NOT NULL,
   model TEXT NOT NULL,

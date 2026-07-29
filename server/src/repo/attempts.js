@@ -1,8 +1,10 @@
 export function attemptsRepo(db) {
   return {
-    create({ question_id, audio_path, cli, model }) {
-      const info = db.prepare("INSERT INTO attempts (question_id,audio_path,cli,model,status) VALUES (?,?,?,?,'uploaded')")
-        .run(question_id, audio_path, cli, model);
+    create({ question_id, audio_path = null, input_mode = 'audio', transcript = null, status = 'uploaded', cli, model }) {
+      const info = db.prepare(
+        `INSERT INTO attempts (question_id,audio_path,input_mode,transcript,cli,model,status)
+         VALUES (?,?,?,?,?,?,?)`
+      ).run(question_id, audio_path, input_mode, transcript, cli, model, status);
       return this.get(info.lastInsertRowid);
     },
     get(id) {

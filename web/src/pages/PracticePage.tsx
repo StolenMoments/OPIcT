@@ -8,6 +8,9 @@ import ErrorAlert from "@/components/ui/ErrorAlert";
 import ActionEmpty from "@/components/ui/ActionEmpty";
 import ListSkeleton from "@/components/ui/ListSkeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 import { useRecorder } from "../hooks/useRecorder";
 import { usePolling } from "../hooks/usePolling";
 import type { Attempt, Question } from "../types";
@@ -34,6 +37,8 @@ export default function PracticePage() {
   const [q, setQ] = useState<Question | null>(null);
   const [cli, setCli] = useState("");
   const [model, setModel] = useState("");
+  const [mode, setMode] = useState<"record" | "text">("record");
+  const [scriptText, setScriptText] = useState("");
   const [attemptId, setAttemptId] = useState<number | null>(null);
   const [active, setActive] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -103,6 +108,8 @@ export default function PracticePage() {
     setAttemptId(null);
     setActive(false);
     setErr(null);
+    setMode("record");
+    setScriptText("");
   };
 
   const handleStart = async () => {
@@ -141,6 +148,32 @@ export default function PracticePage() {
         // flight (the back button and other controls are disabled while
         // `submitting` is true, but this ref read is the authoritative
         // check — it can't go stale the way a captured `q` would).
+        if (qRef.current?.id === questionId) {
+          setAttemptId(id);
+          setActive(true);
+        }
+      } finally {
+        setSubmitting(false);
+      }
+    });
+  };
+
+  const handleSubmitText = () => {
+    // handleFinish 위 주석과 같은 이유로 지금 값을 캡처한다 — 전송 중 다른
+    // 문항으로 이동해도 이 클로저의 questionId는 스크립트를 쓸 때의 문항에 고정된다.
+    const questionId = q!.id;
+    const text = scriptText.trim();
+    setSubmitting(true);
+    return guard(async () => {
+      try {
+        const { id } = await api<{ id: number }>("/attempts", {
+          method: "POST",
+          body: JSON.stringify({
+            question_id: questionId,
+            script_text: text,
+            ...(cli ? { cli, model } : {}),
+          }),
+        });
         if (qRef.current?.id === questionId) {
           setAttemptId(id);
           setActive(true);
@@ -226,45 +259,94 @@ export default function PracticePage() {
             />
           </section>
 
-          <div className="practice-record">
-            {!recording ? (
-              <Button
-                className="practice-record__btn"
-                onClick={handleStart}
-                disabled={busy}
-              >
-                녹음 시작
-              </Button>
-            ) : (
-              <>
-                <span className="practice-record__live" aria-hidden="true">
-                  <span className="practice-record__tally" />
-                </span>
-                <span className="practice-record__elapsed" role="timer">
-                  녹음 중 {formatElapsed(elapsedSec)}
-                </span>
-                {submitting && (
-                  <span
-                    className="practice-transmitting"
-                    role="status"
-                    aria-label="답변 신호 전송 중"
-                  >
-                    <Spinner aria-hidden="true" />
-                    답변 신호 전송 중
-                  </span>
-                )}
+          <Tabs
+            value={mode}
+            onValueChange={(value) => setMode(value as "record" | "text")}
+          >
+            <TabsList variant="line" aria-label="답변 제출 방식">
+              <TabsTrigger value="record" disabled={busy || recording}>
+                녹음
+              </TabsTrigger>
+              <TabsTrigger value="text" disabled={busy || recording}>
+                텍스트로 입력
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {mode === "record" ? (
+            <div className="practice-record">
+              {!recording ? (
                 <Button
                   className="practice-record__btn"
-                  onClick={handleFinish}
-                  disabled={submitting}
-                  aria-busy={submitting}
+                  onClick={handleStart}
+                  disabled={busy}
                 >
-                  {submitting && <Spinner aria-label="답변 업로드 중" />}
-                  녹음 종료·제출
+                  녹음 시작
                 </Button>
-              </>
-            )}
-          </div>
+              ) : (
+                <>
+                  <span className="practice-record__live" aria-hidden="true">
+                    <span className="practice-record__tally" />
+                  </span>
+                  <span className="practice-record__elapsed" role="timer">
+                    녹음 중 {formatElapsed(elapsedSec)}
+                  </span>
+                  {submitting && (
+                    <span
+                      className="practice-transmitting"
+                      role="status"
+                      aria-label="답변 신호 전송 중"
+                    >
+                      <Spinner aria-hidden="true" />
+                      답변 신호 전송 중
+                    </span>
+                  )}
+                  <Button
+                    className="practice-record__btn"
+                    onClick={handleFinish}
+                    disabled={submitting}
+                    aria-busy={submitting}
+                  >
+                    {submitting && <Spinner aria-label="답변 업로드 중" />}
+                    녹음 종료·제출
+                  </Button>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="practice-record">
+              <Field>
+                <FieldLabel htmlFor="practice-script">답변 스크립트</FieldLabel>
+                <Textarea
+                  id="practice-script"
+                  value={scriptText}
+                  onChange={(e) => setScriptText(e.target.value)}
+                  rows={5}
+                  placeholder="답변으로 말하고 싶은 내용을 영어로 입력하세요."
+                  disabled={busy}
+                />
+              </Field>
+              {submitting && (
+                <span
+                  className="practice-transmitting"
+                  role="status"
+                  aria-label="답변 신호 전송 중"
+                >
+                  <Spinner aria-hidden="true" />
+                  답변 신호 전송 중
+                </span>
+              )}
+              <Button
+                className="practice-record__btn"
+                onClick={handleSubmitText}
+                disabled={submitting || !scriptText.trim()}
+                aria-busy={submitting}
+              >
+                {submitting && <Spinner aria-label="스크립트 전송 중" />}
+                스크립트 제출
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 

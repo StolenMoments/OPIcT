@@ -9,7 +9,8 @@ export async function retryRoutes(app) {
   app.post('/api/attempts/:id/retry', async (req, reply) => {
     const row = repos.attempts.get(req.params.id);
     if (!row) return reply.code(404).send({ error: 'not found' });
-    repos.attempts.setStatus(row.id, { status: 'uploaded', error_message: null });
+    const resetStatus = row.input_mode === 'text' ? 'evaluating' : 'uploaded';
+    repos.attempts.setStatus(row.id, { status: resetStatus, error_message: null });
     enqueue(() => runAttempt(repos, row.id));
     return reply.code(202).send({ id: row.id });
   });
@@ -24,7 +25,7 @@ export async function retryRoutes(app) {
 
   app.get('/api/attempts/:id/audio', async (req, reply) => {
     const row = repos.attempts.get(req.params.id);
-    if (!row || !existsSync(row.audio_path)) return reply.code(404).send({ error: 'not found' });
+    if (!row || !row.audio_path || !existsSync(row.audio_path)) return reply.code(404).send({ error: 'not found' });
     return reply.type('audio/webm').send(createReadStream(row.audio_path));
   });
 }

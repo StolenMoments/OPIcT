@@ -19,7 +19,8 @@ export type Attempt = {
   id: number;
   question_id: number;
   question_text?: string;
-  audio_path: string;
+  audio_path: string | null;
+  input_mode: 'audio' | 'text';
   transcript: string | null;
   cli: string;
   model: string;
