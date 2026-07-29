@@ -1,126 +1,105 @@
-# OPIcT — 디자인 시스템
+# OPIcT — Night Broadcast Studio
 
-Register: **product** (design serves the task). 사용자는 연습 중이고, UI는 과업 뒤로 사라져야 한다.
+Register: **product / operate**. 연습자가 밤에 혼자 마이크 앞에 앉아 질문을 읽고 신호를 보내는 소형 방송 부스가 시각 세계다. shadcn/ui의 접근 가능한 기본 동작 위에 방송 콘솔의 계기판 문법을 얹되, 과업보다 장식이 앞서지 않는다.
 
-## 장면
+## 장면과 원칙
 
-30대 직장인이 밤 10시 어두운 거실에서 폰을 세워두고 혼자 영어로 말하며 녹음한다. 문항을 팔 길이에서 읽고, 녹음 버튼을 누르고, 결과를 기다린다. 눈부심이 없어야 하고, 지금 무슨 상태인지(녹음 중 / 처리 중 / 끝남)가 한눈에 보여야 한다.
+30대 직장인이 밤 10시 어두운 거실에서 휴대폰을 세워 두고 답변을 녹음한다. 팔 길이에서도 문항과 녹음 상태가 읽혀야 하고, 업로드·전사·평가 신호가 한눈에 구분되어야 한다.
 
-→ **다크 우선. 앰버 액센트 하나(녹음 탤리 램프). 나머지는 무채색.**
+- 다크가 기본이며 라이트와 시스템 테마도 동등하게 동작한다.
+- 흑연색 표면과 앰버 탤리 한 색으로 신호를 만든다.
+- 패널은 방송 콘솔처럼 선명한 구획과 상태 레일을 갖되 카드 중첩은 피한다.
+- 기존 PWA 아이콘과 정적 브랜드 색 `#221d19`, `#e2883f`, `#fff8e7`을 유지한다.
 
-## PWA 크롬·아이콘 색 결정
+## 기술 기반
 
-PWA 크롬은 기존 다크 우선 앰버 시스템을 따른다. 매니페스트의 `background_color`와 아이콘 바탕은 기존 favicon의 다크 뉴트럴 `#221d19`, `theme_color`와 아이콘의 앰버 표식은 기존 favicon의 `#e2883f`, 아이콘 글자는 밝은 잉크 `#fff8e7`로 고정한다. 이 세 색은 설치 화면과 런처 아이콘에서 같은 브랜드 인상을 유지하기 위한 정적 색상이며, 매니페스트와 PNG 아이콘에서 일관되게 사용한다.
+- Tailwind CSS v4와 CSS 변수, `@/*` 별칭을 사용한다.
+- shadcn/ui는 Base UI 기반 `base-mira`, neutral base, Lucide 아이콘으로 구성한다.
+- 생성 컴포넌트는 `web/src/components/ui`에 두며 React 18을 유지한다.
+- 앱 의미는 `StatusBadge`, `ErrorAlert`, `ActionEmpty`, `ListSkeleton` 같은 얇은 래퍼에서만 추가한다.
+- 새 시각 결정은 `web/src/styles/globals.css`의 토큰이나 의미 있는 컴포넌트 클래스에 둔다. 인라인 스타일로 토큰을 우회하지 않는다.
 
-## 색 (OKLCH, 전략: Restrained)
+## 색과 테마
 
-라이트/다크 두 테마를 모두 정의하되 **다크가 기본**이다. `:root`에 다크 값을 두고 `@media (prefers-color-scheme: light)`에서 라이트로 덮는다.
+색 전략은 **Restrained**다. 중립 표면에 앰버를 primary action, 현재 탭, 녹음·진행 신호에만 사용한다. 성공과 위험은 계약상 필요한 상태에만 제한한다.
+
+| 역할 | 다크 | 라이트 |
+|---|---|---|
+| background | `oklch(0.15 0.008 55)` | `oklch(0.98 0.004 70)` |
+| card/popover | `oklch(0.19 0.009 55)` | `oklch(1 0 0)` |
+| secondary/muted | `oklch(0.23 0.010 55)` | `oklch(0.94 0.006 70)` |
+| border/input | `oklch(0.31 0.012 55)` | `oklch(0.86 0.008 70)` |
+| foreground | `oklch(0.96 0.006 70)` | `oklch(0.20 0.010 55)` |
+| muted foreground | `oklch(0.72 0.010 60)` | `oklch(0.45 0.012 55)` |
+| primary | `oklch(0.74 0.155 55)` | `oklch(0.58 0.155 50)` |
+| destructive | `oklch(0.67 0.18 25)` | `oklch(0.56 0.20 25)` |
+| success | `oklch(0.73 0.13 155)` | `oklch(0.48 0.12 155)` |
+| ring | `oklch(0.78 0.12 70)` | `oklch(0.55 0.14 50)` |
+
+`.dark`가 명시적 다크, `.light`가 명시적 라이트를 소유한다. `system`은 OS 선호를 따라 실제 클래스와 `color-scheme`, 브라우저 `theme-color`, Android 시스템 바를 동기화한다.
+
+## 타이포그래피와 수치
+
+한글과 영문이 섞이는 작업 화면이므로 시스템 산세리프를 사용한다.
 
 ```css
-:root {
-  /* 표면 — 브랜드 hue(50°)를 아주 옅게만 섞는다 */
-  --bg:          oklch(0.16 0.008 50);
-  --surface:     oklch(0.21 0.010 50);   /* 카드·패널 */
-  --surface-2:   oklch(0.25 0.012 50);   /* 상단바·하단탭 (두 번째 뉴트럴 레이어) */
-  --line:        oklch(0.32 0.012 50);
-  --line-strong: oklch(0.42 0.014 50);
-
-  /* 잉크 */
-  --ink:         oklch(0.97 0.004 50);
-  --ink-muted:   oklch(0.76 0.010 50);   /* 본문 대비 4.5:1 이상 유지 — 더 어둡게 내리지 말 것 */
-  --ink-faint:   oklch(0.62 0.010 50);   /* 비활성·보조 라벨 전용, 본문 금지 */
-
-  /* 액센트 — primary action, 현재 선택, 녹음 상태에만 */
-  --accent:      oklch(0.74 0.155 50);
-  --accent-hover:oklch(0.79 0.155 50);
-  --accent-ink:  oklch(0.18 0.020 50);   /* 액센트 위 텍스트 */
-  --accent-weak: oklch(0.74 0.155 50 / 0.14);
-
-  --danger:      oklch(0.70 0.170 25);
-  --danger-weak: oklch(0.70 0.170 25 / 0.14);
-  --success:     oklch(0.74 0.130 155);
-
-  --focus:       oklch(0.80 0.120 240);  /* 포커스 링만 다른 hue — 액센트와 혼동 금지 */
-}
+font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
 ```
 
-라이트 테마는 같은 역할 이름으로: `--bg: oklch(1 0 0)`(순백), `--surface: oklch(0.975 0.003 50)`, `--surface-2: oklch(0.95 0.004 50)`, `--ink: oklch(0.22 0.010 50)`, `--ink-muted: oklch(0.45 0.012 50)`, `--accent: oklch(0.55 0.150 50)`, `--accent-ink: oklch(1 0 0)`.
+- 화면 제목 1.5rem/1.25, 패널 제목 1.125rem/1.35, 본문 0.9375rem/1.65, 메타 0.75rem/1.4.
+- 제목은 `letter-spacing: -0.02em`, 본문은 기본 자간을 유지한다.
+- 타이머, 신호 번호, 상태 시간에는 tabular numerals를 사용한다.
+- 문항과 결과 산문은 최대 68ch이며 긴 영문·모델명은 `overflow-wrap: anywhere`로 보존한다.
 
-**규칙**
-- 액센트는 primary 액션 / 현재 탭 / 녹음·진행 상태에만. 장식 금지.
-- 상태 어휘를 표준화: default, hover, focus-visible, active, disabled, selected, loading, error. 모든 인터랙티브 요소가 전부 가져야 한다.
-- 비활성 상태에 채도 높은 색 금지 — `--ink-faint` + `opacity` 사용.
+## 공간과 표면
 
-## 타이포그래피
+- 스페이싱은 4 / 8 / 12 / 16 / 24 / 32 / 48px 리듬을 쓴다.
+- 일반 컨트롤 radius는 8px, 패널은 12px, 배지와 연습 녹음 버튼만 pill이다.
+- 표면은 얇은 1px 보더와 명도 차로 나눈다. 큰 그림자와 보더를 같은 패널에 겹치지 않는다.
+- 떠 있는 AlertDialog와 toast만 절제된 그림자를 허용한다.
+- 목록은 카드 그리드가 아니라 separator가 있는 행으로 표현한다.
 
-한 패밀리만. `font-family: system-ui, -apple-system, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif` — 한글·영문이 한 화면에 섞이므로 한글 폴백을 반드시 포함한다.
+## 셸과 반응형
 
-고정 rem 스케일(비율 1.2, fluid clamp 금지):
+- 모든 화면은 상단 상태 헤더와 하단 고정 5메뉴를 공유한다.
+- 하단 메뉴는 아이콘과 라벨을 함께 쓰며 현재 메뉴는 앰버 라벨과 상단 tally line으로 표시한다. 각 항목은 최소 44px다.
+- 본문은 safe-area를 포함해 헤더와 하단 메뉴에 가리지 않는다.
+- 모바일은 단일 열이다. 900px 이상에서는 본문 최대 폭을 넓혀 연습 신호 레일, 교정 입력·결과, 설정 그룹을 2단으로 배치한다.
+- PC에서도 하단 메뉴 위치를 바꾸지 않는다. 넓은 공간은 본문의 비교와 읽기에만 사용한다.
 
-| 토큰 | 크기 | 용도 |
-|---|---|---|
-| `--t-xs` | 0.75rem | 메타·타임스탬프 |
-| `--t-sm` | 0.8125rem | 라벨·보조 |
-| `--t-base` | 0.9375rem | 본문·폼 |
-| `--t-md` | 1.0625rem | 문항 텍스트·교정문 |
-| `--t-lg` | 1.25rem | 섹션 제목 |
-| `--t-xl` | 1.5rem | 화면 제목 |
+## shadcn/ui 사용 규칙
 
-- 본문 `line-height: 1.6`, 제목 `1.25`.
-- 제목 `letter-spacing: -0.015em` (플로어 -0.04em, 넘지 말 것).
-- 산문은 `max-width: 68ch`, `text-wrap: pretty`. 제목은 `text-wrap: balance`.
-- 영어 예문은 `font-variant-numeric: tabular-nums` 불필요, 대신 `hyphens: none`.
+- Button: `default`, `outline`, `destructive`, `ghost`만 사용한다. 로딩은 라벨을 유지한 채 Spinner를 앞에 둔다.
+- Field/Input/Textarea/Select: 항상 보이는 라벨, 설명, 오류를 연결한다.
+- Alert: 복구 가능한 API 오류와 권한 안내를 표시한다.
+- AlertDialog: 노트·설정 삭제처럼 되돌리기 어려운 행동에만 쓴다. 브라우저 `confirm`을 쓰지 않는다.
+- Badge: 서버, 녹음, 처리 상태를 텍스트와 함께 표시한다.
+- Skeleton/Spinner: Skeleton은 목록·결과 자리 보존, Spinner는 버튼 내부의 짧은 작업에 사용한다.
+- Empty: 현재 상태의 이유와 실행 가능한 다음 행동을 한 문장으로 묶는다.
+- Tabs/Collapsible: 기록 유형과 기록 행의 상세 정보에만 쓴다.
+- Sonner: 저장·복사처럼 화면 구조를 바꾸지 않는 짧은 성공 피드백에 쓴다.
 
-## 공간·형태
+## 화면 계약
 
-- 스페이싱: 4 / 8 / 12 / 16 / 24 / 32 / 48 (`--s-1`…`--s-7`). 리듬을 위해 섹션 간격은 크게, 요소 간격은 작게 — 균일하게 깔지 말 것.
-- radius: 컨트롤 8px, 카드·패널 12px, 태그·상태칩 999px. **16px 초과 금지.**
-- **예외 (연습 화면 녹음 버튼 단 하나만)**: 연습 화면의 단일 주 녹음 컨트롤(녹음 시작/종료·제출)은 엄지로 누르기 편해야 하는 이 앱의 핵심 액션이므로 `height: 56px`, `border-radius: var(--r-pill)`(999px)을 허용한다. 값은 `.practice-record__btn`(`web/src/pages/PracticePage.css`)에 고정. 다른 컨트롤·버튼은 이 예외를 참조하지 않는다 — 일반 Button 세 번째 size를 새로 만들지 말 것.
-- 보더와 큰 그림자를 같은 요소에 겹치지 않는다. 어두운 UI에서는 보더 1px만 쓰고 그림자는 떠 있는 것(팝오버·토스트)에만.
-- **카드 남용 금지.** 목록은 카드 그리드가 아니라 구분선 있는 행(row)으로. 카드 중첩은 항상 오답.
+- 로그인: 방송 부스 입장 패널 한 개로 세션 확인, 비밀번호 제출, 서버 오류를 처리한다.
+- 연습: 질문을 가장 크게 두고 CLI·모델은 옆 신호 레일로 분리한다. 녹음 버튼과 타이머, 탤리, 업로드→전사→평가 신호를 연속으로 보여 준다.
+- 교정: 모바일은 입력 다음 결과, PC는 좌우 비교다. 결과 문맥에서 바로 노트로 저장한다.
+- 노트·설정: 추가·수정은 인라인이며 삭제는 AlertDialog로 확인한다.
+- 기록: 평가/교정 Tabs 아래 Collapsible 행을 사용하고 오디오 재생과 재시도를 유지한다.
+- 모든 화면은 로딩, 실행 가능한 빈 상태, 오류, 긴 콘텐츠, 권한 거부와 파싱 실패를 처리한다.
 
-## 레이아웃
+## 모션과 접근성
 
-모바일 우선. `max-width: 44rem`, 좌우 `--s-4` 패딩.
+- 모션은 150–220ms의 빠른 ease-out이며 탭, 버튼, 배너, skeleton, 녹음 tally처럼 상태 전달에만 쓴다.
+- `prefers-reduced-motion: reduce`에서는 pulse와 이동을 제거한다.
+- 포커스 링은 모든 키보드 조작 요소에 명확히 보이고 본문 대비 4.5:1을 유지한다.
+- 아이콘 단독 버튼은 접근 가능한 이름을 갖고 비동기 변화는 `aria-live`로 알린다.
+- 색만으로 상태를 전달하지 않는다.
 
-- 상단: sticky 헤더(제품명 + 서버 상태 점). `--surface-2`.
-- 본문: `padding-bottom` 은 하단 탭 높이 + `env(safe-area-inset-bottom)`.
-- 하단: fixed 탭바 5개. `--surface-2`, 상단 1px 보더, `padding-bottom: env(safe-area-inset-bottom)`.
-  - 현재 탭: 액센트 색 라벨 + 상단 2px 액센트 인디케이터. 배경 채우기 금지.
-  - 탭 최소 터치 영역 44px.
-- z-index 스케일을 토큰으로: `--z-sticky: 10; --z-popover: 20; --z-modal: 30; --z-toast: 40;` — 999 같은 임의값 금지.
+## 금지
 
-## 컴포넌트 사양
-
-전부 `web/src/styles/` 의 CSS와 `web/src/components/ui/` 의 얇은 래퍼로 구현한다. UI 라이브러리 추가 금지.
-
-- **Button** — variant: `primary`(액센트 채움) / `default`(보더) / `ghost`(투명) / `danger`. size: `md`(높이 40px) / `sm`(32px). 모든 variant에 hover·active·`:focus-visible`(2px `--focus` 아웃라인, offset 2px)·disabled·loading(라벨 유지 + 좌측 스피너, 폭 변하지 않게) 상태. 세 번째 size는 만들지 않는다 — 연습 화면 녹음 버튼의 56px/pill radius는 위 공간·형태 섹션에 적힌 단일·명명된 예외이며 `.practice-record__btn` 클래스로 `primary` variant 위에 국소적으로 얹는다.
-- **Field** — label + control + 선택적 힌트/에러. input·textarea·select 가 동일한 높이·보더·radius·포커스 링을 공유한다.
-- **Row list** — `<ul>` 에 `border-bottom: 1px solid --line`, 마지막 항목 제외. 각 행: 주 텍스트 + 보조 메타 + 우측 액션. hover 시 `--surface` 배경.
-- **Status pill** — `pending`/`running` = `--ink-muted` 보더 + 점 pulse, `done` = `--success`, `error` = `--danger`. 텍스트는 한국어.
-- **Empty state** — "아직 없습니다" 금지. 무엇을 하면 되는지 한 문장 + 그 자리에서 실행 가능한 액션.
-- **Skeleton** — 목록·결과 로딩은 스피너 대신 스켈레톤 행. 중앙 스피너 금지.
-- **Error banner** — 화면 상단에 `--danger-weak` 배경 + `--danger` 텍스트, 닫기 버튼. 페이지마다 같은 컴포넌트.
-- **Inline edit** — `prompt()` / `confirm()` 금지(브라우저 블로킹 다이얼로그). 이름 수정은 그 자리에서 input 으로 전환, 삭제는 행 안에서 "삭제 → 정말?" 2단 확인.
-
-## 모션
-
-- 트랜지션 150–220ms, `cubic-bezier(0.16, 1, 0.3, 1)` (ease-out-expo 계열). 바운스·일래스틱 금지.
-- 상태 전달에만: 탭 인디케이터 이동, 버튼 눌림, 배너 등장, 스켈레톤 shimmer, 녹음 중 pulse.
-- 페이지 로드 시퀀스 애니메이션 금지.
-- `@media (prefers-reduced-motion: reduce)` 에서 모든 애니메이션을 즉시 전환 또는 크로스페이드로 대체하고, pulse 는 정적 표시로.
-- 레이아웃 속성 애니메이션 금지 — `transform`/`opacity` 위주.
-
-## 접근성
-
-- 본문 대비 4.5:1, 큰 텍스트 3:1. placeholder 도 4.5:1.
-- 모든 컨트롤에 접근 가능한 이름(라벨 또는 `aria-label`). 아이콘 단독 버튼 금지 또는 `aria-label` 필수.
-- 비동기 상태 변화(교정 완료, 저장됨, 에러)는 `aria-live="polite"` 영역으로 알린다.
-- 터치 타깃 최소 44×44.
-
-## 금지 (이 프로젝트에서 특히)
-
-- 그라디언트 텍스트, 글래스모피즘, 컬러 사이드 스트라이프, 장식용 그리드 배경, 손그림 SVG.
-- 섹션마다 붙는 작은 대문자 eyebrow, 01/02/03 넘버링.
-- 크림/샌드/베이지 배경.
-- 인라인 `style={{...}}` 로 새 시각 결정을 내리는 것 — 값은 전부 토큰에서.
+- 글래스모피즘, 그라디언트 텍스트, 장식용 그리드 배경, 컬러 사이드 스트라이프.
+- 섹션마다 반복되는 대문자 eyebrow와 의미 없는 번호.
+- 카드 속 카드, 모든 내용을 pill에 넣기, 과도한 둥근 모서리.
+- 장식용 앰버 사용, 바운스 모션, 중앙 전체 화면 spinner.
+- shadcn 컴포넌트의 내부 API를 앱 도메인에 맞춰 과도하게 변형하기.
