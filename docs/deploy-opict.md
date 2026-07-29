@@ -21,7 +21,7 @@ mkdir -p /home/opc/opict
 
 ```dotenv
 OPICT_WHISPER_BIN=/home/opc/tools/whisper.cpp/build/bin/whisper-cli
-OPICT_WHISPER_MODEL=/home/opc/tools/whisper.cpp/models/ggml-base.en.bin
+OPICT_WHISPER_MODEL=/home/opc/tools/whisper.cpp/models/ggml-small.en.bin
 TZ=Asia/Seoul
 ```
 
@@ -46,7 +46,7 @@ bash scripts/bootstrap-opict.sh
 
 부트스트랩은 aarch64가 아니면 중단하고, 이미 바이너리와 모델이 모두 있으면
 기존 설치를 보존한다. 새 설치는 Whisper.cpp `v1.7.4`를 빌드하고
-`models/ggml-base.en.bin`을 준비한다.
+`models/ggml-small.en.bin`을 준비한다.
 
 ## 최초 소스·데이터 전송
 

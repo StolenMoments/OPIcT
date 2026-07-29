@@ -56,7 +56,7 @@ test('bootstrap script pins the whisper installation and validates its executabl
   assert.match(bootstrap, /aarch64/);
   assert.match(bootstrap, /v1\.7\.4/);
   assert.match(bootstrap, /WHISPER_BIN="\$WHISPER_ROOT\/build\/bin\/whisper-cli"/);
-  assert.match(bootstrap, /WHISPER_MODEL="\$WHISPER_ROOT\/models\/ggml-base\.en\.bin"/);
+  assert.match(bootstrap, /WHISPER_MODEL="\$WHISPER_ROOT\/models\/ggml-small\.en\.bin"/);
 });
 
 test('remote deploy script validates runtime prerequisites and restarts opict', () => {
@@ -99,7 +99,7 @@ test('environment example documents the production whisper paths and timezone', 
   const envExample = read('.env.example');
 
   assert.match(envExample, /OPICT_WHISPER_BIN=\/home\/opc\/tools\/whisper\.cpp\/build\/bin\/whisper-cli/);
-  assert.match(envExample, /OPICT_WHISPER_MODEL=\/home\/opc\/tools\/whisper\.cpp\/models\/ggml-base\.en\.bin/);
+  assert.match(envExample, /OPICT_WHISPER_MODEL=\/home\/opc\/tools\/whisper\.cpp\/models\/ggml-small\.en\.bin/);
   assert.match(envExample, /OPICT_APP_PASSWORD_HASH=scrypt\$<generate-on-server>/);
   assert.match(envExample, /OPICT_SESSION_SECRET=<generate-on-server>/);
   assert.match(envExample, /TZ=Asia\/Seoul/);

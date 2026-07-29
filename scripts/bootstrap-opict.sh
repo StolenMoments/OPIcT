@@ -4,7 +4,7 @@ set -Eeuo pipefail
 readonly WHISPER_VERSION="v1.7.4"
 readonly WHISPER_ROOT="/home/opc/tools/whisper.cpp"
 readonly WHISPER_BIN="$WHISPER_ROOT/build/bin/whisper-cli"
-readonly WHISPER_MODEL="$WHISPER_ROOT/models/ggml-base.en.bin"
+readonly WHISPER_MODEL="$WHISPER_ROOT/models/ggml-small.en.bin"
 readonly FFMPEG_VERSION="7.1.1"
 readonly FFMPEG_ROOT="/home/opc/tools/ffmpeg-$FFMPEG_VERSION"
 readonly FFMPEG_BIN="/home/opc/.local/bin/ffmpeg"
@@ -84,7 +84,7 @@ fi
 if [[ ! -f "$WHISPER_MODEL" ]]; then
   (
     cd "$WHISPER_ROOT"
-    bash models/download-ggml-model.sh base.en
+    bash models/download-ggml-model.sh small.en
   )
 fi
 
