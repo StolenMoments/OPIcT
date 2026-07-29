@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="shell_background">#EFF4F9</color>
-    <color name="shell_foreground">#17202A</color>
+    <color name="shell_background">#221D19</color>
+    <color name="shell_background_dark">#221D19</color>
+    <color name="shell_background_light">#F8F7F5</color>
+    <color name="shell_foreground">#FFF8E7</color>
 </resources>

@@ -61,6 +61,7 @@ class MainActivity : ComponentActivity() {
         )
 
         buildShell()
+        applyWebTheme(dark = true)
         createWebView(savedInstanceState)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -143,7 +144,7 @@ class MainActivity : ComponentActivity() {
                 setAcceptCookie(true)
                 setAcceptThirdPartyCookies(this@webView, false)
             }
-            addJavascriptInterface(MicrophonePermissionBridge(), "opictAndroid")
+            addJavascriptInterface(OpictAndroidBridge(), "opictAndroid")
             webViewClient = ShellWebViewClient()
             webChromeClient = ShellChromeClient()
         }
@@ -202,10 +203,28 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private inner class MicrophonePermissionBridge {
+    private inner class OpictAndroidBridge {
         @JavascriptInterface
         fun requestMicrophonePermission() {
             runOnUiThread { handleNativeMicrophonePermissionRequest() }
+        }
+
+        @JavascriptInterface
+        fun setTheme(dark: Boolean) {
+            runOnUiThread { applyWebTheme(dark) }
+        }
+    }
+
+    internal fun applyWebTheme(dark: Boolean) {
+        val background = getColor(
+            if (dark) R.color.shell_background_dark else R.color.shell_background_light,
+        )
+        root.setBackgroundColor(background)
+        window.navigationBarColor = background
+        window.statusBarColor = Color.TRANSPARENT
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !dark
+            isAppearanceLightNavigationBars = !dark
         }
     }
 
