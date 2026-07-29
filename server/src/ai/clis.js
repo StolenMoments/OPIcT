@@ -28,8 +28,10 @@ export const CLIS = {
          join(npmModules(), '@anthropic-ai', 'claude-code', 'bin', 'claude.exe'),
          'claude.cmd']
       : [join(home(), '.local', 'bin', 'claude'), '/usr/local/bin/claude', 'claude'],
+    // --system-prompt로 Claude Code 기본 에이전트 시스템 프롬프트(툴 설명 등, 매 호출마다
+    // 캐시 미스로 수천 토큰 낭비)를 대체 — 실제 지시문은 prompts.js의 프롬프트 본문에 이미 있다.
     argv: (model) => ['--model', model, '--effort', 'low', '--output-format', 'json',
-      '--disallowedTools', '*', '-p'],
+      '--disallowedTools', '*', '--system-prompt', '', '-p'],
     // claude는 {result: "..."} 봉투로 출력 → result만 꺼냄. 실패 시 원문 그대로.
     extract: (stdout) => { try { return JSON.parse(stdout).result ?? stdout; } catch { return stdout; } },
   },
