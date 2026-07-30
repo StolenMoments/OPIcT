@@ -117,7 +117,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
           <PracticePage visible={tab === "practice"} />
         </div>
         <div hidden={tab !== "correct"}>
-          <CorrectPage />
+          <CorrectPage visible={tab === "correct"} />
         </div>
         <div hidden={tab !== "notes"}>
           <NotesPage />

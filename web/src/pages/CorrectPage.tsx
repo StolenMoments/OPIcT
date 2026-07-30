@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import CliPicker from "../components/CliPicker";
 import CategoryPicker from "../components/CategoryPicker";
@@ -74,7 +74,7 @@ function SaveToNote({ text }: { text: string }) {
   );
 }
 
-export default function CorrectPage() {
+export default function CorrectPage({ visible = true }: { visible?: boolean }) {
   const [err, setErr] = useState<string | null>(null);
   const guard = useCallback(async (fn: () => Promise<void>) => {
     try {
@@ -90,6 +90,12 @@ export default function CorrectPage() {
   const [model, setModel] = useState("");
   const [jobId, setJobId] = useState<number | null>(null);
   const [active, setActive] = useState(false);
+
+  // Mirrors the live `jobId` so the settings-refresh effect below can check
+  // it from inside an async callback without depending on `jobId` and
+  // re-running (and re-fetching) every time a correction is submitted.
+  const jobIdRef = useRef<number | null>(jobId);
+  jobIdRef.current = jobId;
 
   const rawRow = usePolling<Correction>(
     () => api<Correction>(`/corrections/${jobId}`),
@@ -109,14 +115,23 @@ export default function CorrectPage() {
     }
   }, [row]);
 
+  // The tabs all stay mounted (App.tsx just toggles `hidden`), so a
+  // mount-only effect would only ever see the settings that existed on
+  // first load. Re-running this whenever the tab becomes visible again
+  // picks up a changed default without requiring a full page refresh.
+  // Skipped once a correction has been submitted so returning to the tab
+  // doesn't silently swap the cli/model shown next to an in-flight or
+  // already-answered job.
   useEffect(() => {
+    if (!visible) return;
     api<Record<string, string>>("/settings").then((s) => {
+      if (jobIdRef.current != null) return;
       if (s.default_cli) {
         setCli(s.default_cli);
         setModel(s[`default_model_${s.default_cli}`] ?? "");
       }
     });
-  }, []);
+  }, [visible]);
 
   const settled = row?.status === "done" || row?.status === "error";
   const busy = jobId != null && !settled;
