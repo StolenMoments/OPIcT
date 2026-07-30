@@ -39,12 +39,16 @@ export default function SettingsPage({ onLogout }: { onLogout: () => void }) {
 
   const [defCli, setDefCli] = useState('');
   const [defModel, setDefModel] = useState('');
+  const [defInputMode, setDefInputMode] = useState<'record' | 'text'>('record');
   useEffect(() => {
     api<Record<string, string>>('/settings')
       .then((settings) => {
         if (settings.default_cli) {
           setDefCli(settings.default_cli);
           setDefModel(settings[`default_model_${settings.default_cli}`] ?? '');
+        }
+        if (settings.default_input_mode === 'text') {
+          setDefInputMode('text');
         }
       })
       .catch((error) => setErr(error instanceof Error ? error.message : String(error)));
@@ -56,6 +60,15 @@ export default function SettingsPage({ onLogout }: { onLogout: () => void }) {
         body: JSON.stringify({ default_cli: defCli, [`default_model_${defCli}`]: defModel }),
       });
       toast.success('기본 평가 채널을 저장했습니다.');
+    });
+  const saveInputMode = (value: 'record' | 'text') =>
+    guard(async () => {
+      await api('/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ default_input_mode: value }),
+      });
+      setDefInputMode(value);
+      toast.success('기본 답변 입력 방식을 저장했습니다.');
     });
 
   const [cats, setCats] = useState<Category[] | null>(null);
@@ -220,6 +233,23 @@ export default function SettingsPage({ onLogout }: { onLogout: () => void }) {
               저장
             </Button>
           </div>
+        </section>
+
+        <section className="section">
+          <h3 className="section__title">기본 답변 입력 방식</h3>
+          <Field className="theme-control">
+            <FieldLabel htmlFor="input-mode-select">입력 방식</FieldLabel>
+            <select
+              id="input-mode-select"
+              className="native-select"
+              value={defInputMode}
+              onChange={(event) => saveInputMode(event.target.value as 'record' | 'text')}
+            >
+              <option value="record">녹음</option>
+              <option value="text">텍스트로 입력</option>
+            </select>
+            <FieldDescription>연습에서 새 문항을 고를 때 기본으로 선택될 답변 방식입니다.</FieldDescription>
+          </Field>
         </section>
 
         <section className="section">

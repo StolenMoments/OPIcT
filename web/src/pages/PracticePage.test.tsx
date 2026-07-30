@@ -105,6 +105,34 @@ describe('PracticePage representative recording flow', () => {
     finishSubmit?.({ id: 91 });
   });
 
+  it('defaults new questions to the saved default input mode', async () => {
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === '/settings') return { default_input_mode: 'text' };
+      if (path === '/categories') return [{ id: 1, type: 'survey', name: '일상', sort_order: 0 }];
+      if (path === '/questions?category_id=1') {
+        return [
+          { id: 7, category_id: 1, text: 'Tell me about your day.', note: null, created_at: '' },
+          { id: 8, category_id: 1, text: 'Tell me about your weekend.', note: null, created_at: '' },
+        ];
+      }
+      if (path === '/meta/clis') return [{ name: 'codex', label: 'Codex', models: ['gpt'] }];
+      return null;
+    });
+
+    render(<PracticePage />);
+
+    fireEvent.click(await screen.findByRole('combobox', { name: '카테고리 선택' }));
+    fireEvent.click(await screen.findByRole('option', { name: '[서베이] 일상' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Tell me about your day.' }));
+
+    expect(await screen.findByRole('tab', { name: '텍스트로 입력', selected: true })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '문항 목록으로' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Tell me about your weekend.' }));
+
+    expect(await screen.findByRole('tab', { name: '텍스트로 입력', selected: true })).toBeInTheDocument();
+  });
+
   it('shows a microphone denial only once', async () => {
     recorderScenario.failStart = true;
     vi.mocked(api).mockImplementation(async (path) => {

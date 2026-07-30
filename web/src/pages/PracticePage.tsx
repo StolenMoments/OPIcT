@@ -58,11 +58,20 @@ export default function PracticePage() {
   const qRef = useRef<Question | null>(q);
   qRef.current = q;
 
+  // selectQuestion resets `mode` to the user's saved default on every question
+  // change; a ref (not state) is used because the async /settings fetch below
+  // may resolve after the user has already picked a question.
+  const defaultModeRef = useRef<"record" | "text">("record");
+
   useEffect(() => {
     api<Record<string, string>>("/settings").then((s) => {
       if (s.default_cli) {
         setCli(s.default_cli);
         setModel(s[`default_model_${s.default_cli}`] ?? "");
+      }
+      if (s.default_input_mode === "text" || s.default_input_mode === "record") {
+        defaultModeRef.current = s.default_input_mode;
+        setMode(s.default_input_mode);
       }
     });
   }, []);
@@ -108,7 +117,7 @@ export default function PracticePage() {
     setAttemptId(null);
     setActive(false);
     setErr(null);
-    setMode("record");
+    setMode(defaultModeRef.current);
     setScriptText("");
   };
 

@@ -60,3 +60,18 @@ test('correction: default_cli set but its default_model_<cli> missing rejected w
   const res = await app.inject({ method: 'POST', url: '/api/corrections', payload: { input_text: 'hello' } });
   assert.equal(res.statusCode, 400);
 });
+
+test('PUT /api/settings accepts default_input_mode record/text', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const res = await app.inject({ method: 'PUT', url: '/api/settings', payload: { default_input_mode: 'text' } });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.json().default_input_mode, 'text');
+});
+
+test('PUT /api/settings rejects invalid default_input_mode', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const res = await app.inject({ method: 'PUT', url: '/api/settings', payload: { default_input_mode: 'video' } });
+  assert.equal(res.statusCode, 400);
+});
