@@ -133,6 +133,36 @@ describe('PracticePage representative recording flow', () => {
     expect(await screen.findByRole('tab', { name: '텍스트로 입력', selected: true })).toBeInTheDocument();
   });
 
+  it('applies a changed default input mode after returning to the tab, without a full remount', async () => {
+    // App.tsx keeps every tab mounted and toggles `hidden`, so PracticePage
+    // never unmounts when the user visits Settings and comes back — the
+    // settings-fetch effect must re-run on the `visible` prop, not just on
+    // first mount, for a saved default to take effect without a page reload.
+    let settingsResponse: Record<string, string> = { default_input_mode: 'record' };
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === '/settings') return settingsResponse;
+      if (path === '/categories') return [{ id: 1, type: 'survey', name: '일상', sort_order: 0 }];
+      if (path === '/questions?category_id=1') {
+        return [{ id: 7, category_id: 1, text: 'Tell me about your day.', note: null, created_at: '' }];
+      }
+      if (path === '/meta/clis') return [{ name: 'codex', label: 'Codex', models: ['gpt'] }];
+      return null;
+    });
+
+    const { rerender } = render(<PracticePage visible />);
+    await screen.findByRole('combobox', { name: '카테고리 선택' });
+
+    settingsResponse = { default_input_mode: 'text' };
+    rerender(<PracticePage visible={false} />);
+    rerender(<PracticePage visible />);
+
+    fireEvent.click(screen.getByRole('combobox', { name: '카테고리 선택' }));
+    fireEvent.click(await screen.findByRole('option', { name: '[서베이] 일상' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Tell me about your day.' }));
+
+    expect(await screen.findByRole('tab', { name: '텍스트로 입력', selected: true })).toBeInTheDocument();
+  });
+
   it('shows a microphone denial only once', async () => {
     recorderScenario.failStart = true;
     vi.mocked(api).mockImplementation(async (path) => {

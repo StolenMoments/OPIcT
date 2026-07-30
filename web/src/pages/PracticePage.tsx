@@ -21,7 +21,7 @@ function formatElapsed(sec: number): string {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-export default function PracticePage() {
+export default function PracticePage({ visible = true }: { visible?: boolean }) {
   const [err, setErr] = useState<string | null>(null);
   const guard = useCallback(async (fn: () => Promise<void>) => {
     try {
@@ -63,18 +63,30 @@ export default function PracticePage() {
   // may resolve after the user has already picked a question.
   const defaultModeRef = useRef<"record" | "text">("record");
 
+  // The practice, correct, notes, history and settings tabs all stay mounted
+  // at once (App.tsx toggles `hidden`, it doesn't unmount), so a mount-only
+  // effect would only ever see the settings that existed on first load.
+  // Re-running this whenever the tab becomes visible again picks up changes
+  // saved from the settings tab without requiring a full page refresh. Only
+  // the picker screen's cli/mode selectors are overwritten (`!qRef.current`)
+  // so returning to an in-progress recording or typed answer doesn't get its
+  // selection reset out from under the user.
   useEffect(() => {
+    if (!visible) return;
     api<Record<string, string>>("/settings").then((s) => {
+      if (s.default_input_mode === "text" || s.default_input_mode === "record") {
+        defaultModeRef.current = s.default_input_mode;
+      }
+      if (qRef.current) return;
       if (s.default_cli) {
         setCli(s.default_cli);
         setModel(s[`default_model_${s.default_cli}`] ?? "");
       }
       if (s.default_input_mode === "text" || s.default_input_mode === "record") {
-        defaultModeRef.current = s.default_input_mode;
         setMode(s.default_input_mode);
       }
     });
-  }, []);
+  }, [visible]);
 
   const loadQs = useCallback(() => {
     if (!catId) {
