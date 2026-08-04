@@ -23,6 +23,8 @@ export function buildEvalPrompt(questionText, transcript) {
     'Base summary_ko, strengths_ko and improvements_ko on the original transcribed answer, including its task fulfillment, organization, vocabulary and grammar.',
     'Use corrected_answer only as a reference for improved English wording, not as the answer being evaluated.',
     'Do not mention Korean usage in the feedback fields; explain the intended English expression or grammar issue instead.',
+    'Never use the words "Korean", "한국어", or "한국어 문장" in summary_ko, strengths_ko, improvements_ko, and never say that Korean was used.',
+    'Instead, describe the needed English expression or grammar correction directly; for example, say "The final sentence needs to be expressed naturally in English."',
     '',
     `Question: ${questionText}`,
     `Transcribed answer: ${transcript}`,
