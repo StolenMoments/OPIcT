@@ -639,6 +639,20 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.diff-text {
+  line-height: 1.7;
+}
+.diff-text__delete {
+  color: var(--destructive);
+  text-decoration: line-through;
+}
+.diff-text__insert {
+  color: var(--success);
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.1em;
+}
 
 .correct-layout {
   display: grid;

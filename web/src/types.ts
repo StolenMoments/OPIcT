@@ -35,4 +35,5 @@ export type EvalResult = {
   strengths_ko: string[];
   improvements_ko: string[];
   recommended_expressions: { text: string; note_ko: string }[];
+  corrected_answer?: string;
 };

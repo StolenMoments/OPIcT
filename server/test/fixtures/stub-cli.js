@@ -8,6 +8,7 @@ process.stdin.on('end', () => {
     strengths_ko: ['일관된 시제'],
     improvements_ko: ['디테일 추가'],
     recommended_expressions: [{ text: 'clear my head', note_ko: '머리를 식히다' }],
+    corrected_answer: 'I have been jogging every morning for two years.',
   }));
 });
 process.stdin.on('data', () => {});

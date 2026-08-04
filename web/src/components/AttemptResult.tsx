@@ -1,5 +1,6 @@
 import ErrorAlert from './ui/ErrorAlert';
 import StatusBadge from './ui/StatusBadge';
+import { diffWords } from '../lib/diff';
 import type { Attempt, EvalResult } from '../types';
 
 const PIPELINE_AUDIO = [
@@ -27,7 +28,8 @@ function safeParseResult(json: string | null): EvalResult | null {
       typeof parsed.summary_ko !== 'string' ||
       !Array.isArray(parsed.strengths_ko) ||
       !Array.isArray(parsed.improvements_ko) ||
-      !Array.isArray(parsed.recommended_expressions)
+      !Array.isArray(parsed.recommended_expressions) ||
+      (parsed.corrected_answer !== undefined && typeof parsed.corrected_answer !== 'string')
     ) {
       return null;
     }
@@ -106,6 +108,31 @@ export default function AttemptResult({ row }: { row: Attempt }) {
         <h3>총평</h3>
         <p>{result.summary_ko}</p>
       </div>
+      {row.transcript && result.corrected_answer && (
+        <div>
+          <h3>전체 교정본</h3>
+          <p className="row-list__meta">취소선은 삭제된 표현, 강조색은 수정·추가된 표현입니다.</p>
+          <p className="diff-text">
+            {diffWords(row.transcript, result.corrected_answer).map((token, i) => {
+              if (token.type === 'delete') {
+                return (
+                  <del key={i} className="diff-text__delete">
+                    {token.text}
+                  </del>
+                );
+              }
+              if (token.type === 'insert') {
+                return (
+                  <ins key={i} className="diff-text__insert">
+                    {token.text}
+                  </ins>
+                );
+              }
+              return <span key={i}>{token.text}</span>;
+            })}
+          </p>
+        </div>
+      )}
       <div>
         <h3>잘한 점</h3>
         <ul className="row-list">

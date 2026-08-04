@@ -38,6 +38,31 @@ describe('AttemptResult', () => {
     expect(screen.getByText('좋음')).toBeTruthy();
   });
 
+  it('renders a word-level diff between the transcript and the corrected answer', () => {
+    const result_json = JSON.stringify({
+      summary_ko: '좋음',
+      strengths_ko: ['a'],
+      improvements_ko: ['b'],
+      recommended_expressions: [{ text: 'x', note_ko: 'y' }],
+      corrected_answer: 'I went to the park yesterday.',
+    });
+    render(
+      <AttemptResult
+        row={
+          {
+            ...base,
+            status: 'done',
+            transcript: 'I go to the park yesterday.',
+            result_json,
+            error_message: null,
+          } as Attempt
+        }
+      />,
+    );
+    expect(screen.getByText('go')).toBeTruthy();
+    expect(screen.getByText('went')).toBeTruthy();
+  });
+
   it('falls back to an error message when result_json is malformed', () => {
     render(
       <AttemptResult
