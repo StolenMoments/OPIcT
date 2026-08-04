@@ -20,6 +20,8 @@ export function buildEvalPrompt(questionText, transcript) {
     '"corrected_answer" must be the full transcribed answer rewritten in English with grammar errors fixed and awkward expressions improved, keeping the original meaning, structure and length as close to the original as possible so it can be compared word-for-word.',
     'If the transcribed answer contains Korean words, phrases or sentences, translate them into natural English in "corrected_answer" while preserving their meaning.',
     '"corrected_answer" must not contain Korean; keep the original meaning, structure and length as close as possible.',
+    'Base summary_ko, strengths_ko and improvements_ko on the corrected English answer, not on whether Korean was used.',
+    'Do not mention Korean usage in the feedback fields; focus on English expression, grammar and task fulfillment.',
     '',
     `Question: ${questionText}`,
     `Transcribed answer: ${transcript}`,
