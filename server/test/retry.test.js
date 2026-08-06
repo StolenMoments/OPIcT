@@ -33,7 +33,9 @@ test('correction retry resets and reruns same record', async (t) => {
 
   const retried = await waitDone(app, `/api/corrections/${id}`);
   assert.equal(retried.status, 'done');
-  assert.equal((await app.inject({ url: '/api/corrections' })).json().length, 1);
+  const correctionsPage = (await app.inject({ url: '/api/corrections' })).json();
+  assert.equal(correctionsPage.items.length, 1);
+  assert.equal(correctionsPage.total, 1);
 });
 
 test('attempt retry reruns the same record and serves its audio', async (t) => {
@@ -65,7 +67,9 @@ test('attempt retry reruns the same record and serves its audio', async (t) => {
   assert.equal(retry.statusCode, 202);
   assert.equal(retry.json().id, id);
   assert.equal((await waitDone(app, `/api/attempts/${id}`)).status, 'done');
-  assert.equal((await app.inject({ url: '/api/attempts' })).json().length, 1);
+  const attemptsPage = (await app.inject({ url: '/api/attempts' })).json();
+  assert.equal(attemptsPage.items.length, 1);
+  assert.equal(attemptsPage.total, 1);
 });
 
 test('text-mode attempt retry resets to evaluating (not uploaded) and reruns with the same script', async (t) => {

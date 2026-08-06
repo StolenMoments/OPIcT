@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { CLIS } from '../ai/clis.js';
 import { enqueue } from '../ai/queue.js';
 import { runAttempt } from '../pipelines/attempt.js';
+import { parsePaginationQuery } from './pagination.js';
 
 // process.cwd()에 의존하지 않도록 모듈 위치 기준 절대 경로 사용
 const uploadsDir = fileURLToPath(new URL('../../data/uploads', import.meta.url));
@@ -67,7 +68,10 @@ export async function attemptsRoutes(app) {
     return reply.code(202).send({ id: row.id });
   });
 
-  app.get('/api/attempts', async () => repos.attempts.list());
+  app.get('/api/attempts', async (req) => {
+    const { limit, offset, search } = parsePaginationQuery(req.query);
+    return { ...repos.attempts.list({ limit, offset, search }), limit, offset };
+  });
   app.get('/api/attempts/:id', async (req, reply) => {
     const row = repos.attempts.get(req.params.id);
     return row ?? reply.code(404).send({ error: 'not found' });

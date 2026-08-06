@@ -1,3 +1,5 @@
+import { escapeLikeContains } from './search.js';
+
 export function attemptsRepo(db) {
   return {
     create({ question_id, audio_path = null, input_mode = 'audio', transcript = null, status = 'uploaded', cli, model }) {
@@ -10,10 +12,17 @@ export function attemptsRepo(db) {
     get(id) {
       return db.prepare('SELECT * FROM attempts WHERE id=?').get(id);
     },
-    list() {
-      return db.prepare(
-        'SELECT a.*, q.text AS question_text FROM attempts a JOIN questions q ON q.id=a.question_id ORDER BY a.id DESC'
-      ).all();
+    list({ limit, offset, search }) {
+      const where = search ? "WHERE LOWER(q.text) LIKE LOWER(?) ESCAPE '\\'" : '';
+      const params = search ? [escapeLikeContains(search)] : [];
+      const total = db.prepare(
+        `SELECT COUNT(*) AS total FROM attempts a JOIN questions q ON q.id=a.question_id ${where}`
+      ).get(...params).total;
+      const items = db.prepare(
+        `SELECT a.*, q.text AS question_text FROM attempts a JOIN questions q ON q.id=a.question_id ${where}
+         ORDER BY a.id DESC LIMIT ? OFFSET ?`
+      ).all(...params, limit, offset);
+      return { items, total };
     },
     setStatus(id, { status, transcript = null, result_json = null, raw_output = null, error_message = null }) {
       db.prepare(`UPDATE attempts SET status=?, transcript=COALESCE(?,transcript),

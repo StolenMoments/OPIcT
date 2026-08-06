@@ -1,6 +1,7 @@
 import { CLIS } from '../ai/clis.js';
 import { enqueue } from '../ai/queue.js';
 import { runCorrection } from '../pipelines/correction.js';
+import { parsePaginationQuery } from './pagination.js';
 
 export async function correctionsRoutes(app) {
   const repos = app.repos;
@@ -17,7 +18,10 @@ export async function correctionsRoutes(app) {
     return reply.code(202).send({ id: row.id });
   });
 
-  app.get('/api/corrections', async () => repos.corrections.list());
+  app.get('/api/corrections', async (req) => {
+    const { limit, offset, search } = parsePaginationQuery(req.query);
+    return { ...repos.corrections.list({ limit, offset, search }), limit, offset };
+  });
   app.get('/api/corrections/:id', async (req, reply) => {
     const row = repos.corrections.get(req.params.id);
     return row ?? reply.code(404).send({ error: 'not found' });
