@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { api } from '../api';
 import AttemptResult from '../components/AttemptResult';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -10,7 +11,17 @@ import ErrorAlert from '@/components/ui/ErrorAlert';
 import ListSkeleton from '@/components/ui/ListSkeleton';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { usePolling } from '../hooks/usePolling';
-import type { Attempt, Correction, CorrectionResult } from '../types';
+import type { Attempt, Correction, CorrectionResult, PaginatedResponse } from '../types';
+
+type HistoryKind = 'attempts' | 'corrections';
+
+const PAGE_SIZE = 10;
+
+function historyPath(kind: HistoryKind, offset: number, search: string) {
+  const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+  if (search.trim()) params.set('search', search.trim());
+  return `/${kind}?${params.toString()}`;
+}
 
 function safeParseCorrection(json: string | null): CorrectionResult | null {
   if (!json) return null;
@@ -176,7 +187,10 @@ function HistoryRow({
 }
 
 export default function HistoryPage() {
-  const [kind, setKind] = useState<'attempts' | 'corrections'>('attempts');
+  const [kind, setKind] = useState<HistoryKind>('attempts');
+  const [search, setSearch] = useState('');
+  const [offset, setOffset] = useState(0);
+  const [refresh, setRefresh] = useState(0);
   const [openId, setOpenId] = useState<number | null>(null);
   const [retryingId, setRetryingId] = useState<number | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
@@ -185,36 +199,51 @@ export default function HistoryPage() {
 
   const fetchAttempts = useCallback(async () => {
     try {
-      const rows = await api<Attempt[]>('/attempts');
+      const page = await api<PaginatedResponse<Attempt>>(historyPath('attempts', offset, search));
       setAttemptsError(null);
-      return rows;
+      return page;
     } catch (error) {
       setAttemptsError(error instanceof Error ? error.message : '평가 기록을 불러오지 못했습니다.');
       throw error;
     }
-  }, []);
+  }, [offset, search]);
 
   const fetchCorrections = useCallback(async () => {
     try {
-      const rows = await api<Correction[]>('/corrections');
+      const page = await api<PaginatedResponse<Correction>>(historyPath('corrections', offset, search));
       setCorrectionsError(null);
-      return rows;
+      return page;
     } catch (error) {
       setCorrectionsError(error instanceof Error ? error.message : '교정 기록을 불러오지 못했습니다.');
       throw error;
     }
-  }, []);
+  }, [offset, search]);
 
-  const attempts = usePolling<Attempt[]>(fetchAttempts, kind === 'attempts');
-  const corrections = usePolling<Correction[]>(fetchCorrections, kind === 'corrections');
-  const rows = kind === 'attempts' ? attempts : corrections;
+  const resetKey = `${kind}:${offset}:${search}:${refresh}`;
+  const attempts = usePolling<PaginatedResponse<Attempt>>(fetchAttempts, kind === 'attempts', 2000, resetKey);
+  const corrections = usePolling<PaginatedResponse<Correction>>(fetchCorrections, kind === 'corrections', 2000, resetKey);
+  const page = kind === 'attempts' ? attempts : corrections;
+  const rows = page?.items ?? null;
+  const total = page?.total ?? 0;
   const loadError = kind === 'attempts' ? attemptsError : correctionsError;
 
-  const selectKind = (nextKind: 'attempts' | 'corrections') => {
-    setKind(nextKind);
+  const clearRowState = () => {
     setOpenId(null);
     setRetryingId(null);
     setRetryError(null);
+  };
+
+  const selectKind = (nextKind: HistoryKind) => {
+    setKind(nextKind);
+    setSearch('');
+    setOffset(0);
+    clearRowState();
+  };
+
+  const changeSearch = (value: string) => {
+    setSearch(value);
+    setOffset(0);
+    clearRowState();
   };
 
   const retry = async (path: string, id: number) => {
@@ -222,6 +251,7 @@ export default function HistoryPage() {
     setRetryError(null);
     try {
       await api(path, { method: 'POST' });
+      setRefresh((current) => current + 1);
     } catch (error) {
       setRetryError(error instanceof Error ? error.message : '다시 시도하지 못했습니다.');
     } finally {
@@ -243,6 +273,17 @@ export default function HistoryPage() {
         </TabsList>
       </Tabs>
 
+      <div className="history-page__search">
+        <label htmlFor="history-search">기록 검색</label>
+        <Input
+          id="history-search"
+          type="search"
+          value={search}
+          placeholder={kind === 'attempts' ? '문항 검색' : '입력 문장 검색'}
+          onChange={(event) => changeSearch(event.target.value)}
+        />
+      </div>
+
       {loadError && <ErrorAlert message={loadError} />}
       {retryError && <ErrorAlert message={retryError} onDismiss={() => setRetryError(null)} />}
 
@@ -252,7 +293,13 @@ export default function HistoryPage() {
         aria-label={kind === 'attempts' ? '평가 기록 목록' : '교정 기록 목록'}
       >
         {rows === null && <ListSkeleton rows={3} />}
-        {rows !== null && rows.length === 0 && (
+        {rows !== null && rows.length === 0 && total === 0 && search && (
+          <ActionEmpty
+            message={`“${search}” 검색 결과가 없습니다.`}
+            action={<Button size="sm" variant="outline" onClick={() => changeSearch('')}>검색어 지우기</Button>}
+          />
+        )}
+        {rows !== null && rows.length === 0 && total === 0 && !search && (
           <ActionEmpty
             message={
               kind === 'attempts'
@@ -270,6 +317,9 @@ export default function HistoryPage() {
             }
           />
         )}
+        {rows !== null && rows.length === 0 && total > 0 && (
+          <ActionEmpty message="이 페이지에 표시할 기록이 없습니다." />
+        )}
         {rows !== null && rows.length > 0 && (
           <ul className="row-list history-list">
             {rows.map((row) => (
@@ -278,7 +328,7 @@ export default function HistoryPage() {
                 row={row}
                 open={openId === row.id}
                 retrying={retryingId === row.id}
-                onToggle={() => setOpenId(openId === row.id ? null : row.id)}
+                onToggle={() => setOpenId((current) => current === row.id ? null : row.id)}
                 onRetry={() =>
                   retry(kind === 'attempts' ? `/attempts/${row.id}/retry` : `/corrections/${row.id}/retry`, row.id)
                 }
@@ -287,6 +337,18 @@ export default function HistoryPage() {
           </ul>
         )}
       </section>
+
+      <nav className="history-page__pagination" aria-label="기록 페이지 이동">
+        <Button variant="outline" onClick={() => setOffset((current) => Math.max(0, current - PAGE_SIZE))} disabled={offset === 0}>
+          이전 페이지
+        </Button>
+        <span className="history-page__page-status" aria-live="polite">
+          {Math.floor(offset / PAGE_SIZE) + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))} 페이지
+        </span>
+        <Button variant="outline" onClick={() => setOffset((current) => current + PAGE_SIZE)} disabled={offset + PAGE_SIZE >= total}>
+          다음 페이지
+        </Button>
+      </nav>
     </div>
   );
 }

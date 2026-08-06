@@ -11,5 +11,5 @@ export default defineConfig({
     },
   },
   server: { proxy: { '/api': process.env.VITE_API_PROXY ?? 'http://localhost:3000' } },
-  test: { environment: 'jsdom' },
+  test: { environment: 'jsdom', setupFiles: './src/test/setup.ts' },
 });

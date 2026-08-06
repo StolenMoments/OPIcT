@@ -17,7 +17,7 @@ describe("App authentication gate", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
+    window.localStorage.clear();
     document.documentElement.className = "";
   });
 
@@ -37,6 +37,9 @@ describe("App authentication gate", () => {
       if (path === "/health") return { ok: true };
       if (path === "/settings") return {};
       if (path === "/categories") return [];
+      if (path.startsWith("/attempts?") || path.startsWith("/corrections?")) {
+        return { items: [], total: 0, limit: 10, offset: 0 };
+      }
       return [];
     });
 
@@ -69,6 +72,9 @@ describe("App authentication gate", () => {
       if (path === "/health") return { ok: true };
       if (path === "/settings") return {};
       if (path === "/categories") return [];
+      if (path.startsWith("/attempts?") || path.startsWith("/corrections?")) {
+        return { items: [], total: 0, limit: 10, offset: 0 };
+      }
       return [];
     });
 
@@ -79,7 +85,7 @@ describe("App authentication gate", () => {
     });
 
     await waitFor(() => {
-      expect(localStorage.getItem("opict-theme")).toBe("light");
+      expect(window.localStorage.getItem("opict-theme")).toBe("light");
       expect(document.documentElement).toHaveClass("light");
       expect(setTheme).toHaveBeenLastCalledWith(false);
     });
@@ -93,7 +99,9 @@ describe("App authentication gate", () => {
       if (path === "/health") return { ok: true };
       if (path === "/settings") return {};
       if (path === "/categories") return [];
-      if (path === "/attempts" || path === "/corrections") return [];
+      if (path.startsWith("/attempts?") || path.startsWith("/corrections?")) {
+        return { items: [], total: 0, limit: 10, offset: 0 };
+      }
       return [];
     });
 

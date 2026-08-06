@@ -671,6 +671,25 @@
   flex-direction: column;
   gap: 0.35rem;
 }
+.history-page__search {
+  display: grid;
+  gap: 0.5rem;
+}
+.history-page__search label {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+.history-page__pagination {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+.history-page__page-status {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  text-align: center;
+}
 .history-entry {
   border-bottom: 1px solid var(--border);
 }

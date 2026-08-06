@@ -37,3 +37,9 @@ export type EvalResult = {
   recommended_expressions: { text: string; note_ko: string }[];
   corrected_answer?: string;
 };
+export type PaginatedResponse<T> = {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+};
