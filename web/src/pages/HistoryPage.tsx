@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
 import AttemptResult from '../components/AttemptResult';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import type { Attempt, Correction, CorrectionResult, PaginatedResponse } from '.
 type HistoryKind = 'attempts' | 'corrections';
 
 const PAGE_SIZE = 10;
+const SEARCH_DEBOUNCE_MS = 300;
 
 function historyPath(kind: HistoryKind, offset: number, search: string) {
   const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
@@ -188,6 +189,7 @@ function HistoryRow({
 
 export default function HistoryPage() {
   const [kind, setKind] = useState<HistoryKind>('attempts');
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [offset, setOffset] = useState(0);
   const [refresh, setRefresh] = useState(0);
@@ -225,25 +227,36 @@ export default function HistoryPage() {
   const page = kind === 'attempts' ? attempts : corrections;
   const rows = page?.items ?? null;
   const total = page?.total ?? 0;
+  const pageSize = page?.limit ?? PAGE_SIZE;
   const loadError = kind === 'attempts' ? attemptsError : correctionsError;
 
-  const clearRowState = () => {
+  const selectKind = (nextKind: HistoryKind) => {
+    setKind(nextKind);
+    setSearchInput('');
+    setSearch('');
+    setOffset(0);
     setOpenId(null);
     setRetryingId(null);
     setRetryError(null);
   };
 
-  const selectKind = (nextKind: HistoryKind) => {
-    setKind(nextKind);
-    setSearch('');
+  const applySearch = useCallback((value: string) => {
+    setSearch(value.trim());
     setOffset(0);
-    clearRowState();
-  };
+    setOpenId(null);
+    setRetryingId(null);
+    setRetryError(null);
+  }, []);
 
-  const changeSearch = (value: string) => {
-    setSearch(value);
-    setOffset(0);
-    clearRowState();
+  useEffect(() => {
+    if (searchInput.trim() === search) return;
+    const timer = setTimeout(() => applySearch(searchInput), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput, search, applySearch]);
+
+  const clearSearch = () => {
+    setSearchInput('');
+    applySearch('');
   };
 
   const retry = async (path: string, id: number) => {
@@ -278,9 +291,9 @@ export default function HistoryPage() {
         <Input
           id="history-search"
           type="search"
-          value={search}
+          value={searchInput}
           placeholder={kind === 'attempts' ? '문항 검색' : '입력 문장 검색'}
-          onChange={(event) => changeSearch(event.target.value)}
+          onChange={(event) => setSearchInput(event.target.value)}
         />
       </div>
 
@@ -296,7 +309,7 @@ export default function HistoryPage() {
         {rows !== null && rows.length === 0 && total === 0 && search && (
           <ActionEmpty
             message={`“${search}” 검색 결과가 없습니다.`}
-            action={<Button size="sm" variant="outline" onClick={() => changeSearch('')}>검색어 지우기</Button>}
+            action={<Button size="sm" variant="outline" onClick={clearSearch}>검색어 지우기</Button>}
           />
         )}
         {rows !== null && rows.length === 0 && total === 0 && !search && (
@@ -339,13 +352,13 @@ export default function HistoryPage() {
       </section>
 
       <nav className="history-page__pagination" aria-label="기록 페이지 이동">
-        <Button variant="outline" onClick={() => setOffset((current) => Math.max(0, current - PAGE_SIZE))} disabled={offset === 0}>
+        <Button variant="outline" onClick={() => setOffset((current) => Math.max(0, current - pageSize))} disabled={offset === 0}>
           이전 페이지
         </Button>
         <span className="history-page__page-status" aria-live="polite">
-          {Math.floor(offset / PAGE_SIZE) + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))} 페이지
+          {Math.floor(offset / pageSize) + 1} / {Math.max(1, Math.ceil(total / pageSize))} 페이지
         </span>
-        <Button variant="outline" onClick={() => setOffset((current) => current + PAGE_SIZE)} disabled={offset + PAGE_SIZE >= total}>
+        <Button variant="outline" onClick={() => setOffset((current) => current + pageSize)} disabled={offset + pageSize >= total}>
           다음 페이지
         </Button>
       </nav>

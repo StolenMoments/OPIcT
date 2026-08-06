@@ -70,6 +70,33 @@ describe('HistoryPage pagination and search', () => {
     await waitFor(() => expect(api).toHaveBeenLastCalledWith('/attempts?limit=10&offset=0&search=park'));
   });
 
+  it('debounces rapid keystrokes into a single search request', async () => {
+    render(<HistoryPage />);
+    await screen.findByText('Question 1');
+    vi.mocked(api).mockClear();
+
+    const input = screen.getByRole('searchbox', { name: '기록 검색' });
+    fireEvent.change(input, { target: { value: 'p' } });
+    fireEvent.change(input, { target: { value: 'pa' } });
+    fireEvent.change(input, { target: { value: 'park' } });
+
+    expect(api).not.toHaveBeenCalled();
+    await waitFor(() => expect(api).toHaveBeenLastCalledWith('/attempts?limit=10&offset=0&search=park'));
+    expect(api).toHaveBeenCalledTimes(1);
+  });
+
+  it('trims whitespace-only search input instead of treating it as a search term', async () => {
+    render(<HistoryPage />);
+    await screen.findByText('Question 1');
+
+    fireEvent.change(screen.getByRole('searchbox', { name: '기록 검색' }), {
+      target: { value: '   ' },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    expect(api).toHaveBeenLastCalledWith('/attempts?limit=10&offset=0');
+  });
+
   it('clears the search and page when switching from evaluation to correction', async () => {
     render(<HistoryPage />);
     fireEvent.change(await screen.findByRole('searchbox', { name: '기록 검색' }), {
