@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { CLIS } from '../src/ai/clis.js';
 import { buildInvocation } from '../src/ai/runner.js';
 
-test('모든 CLI가 effort low로 호출된다', () => {
+test('CLI별 effort로 호출된다', () => {
   const claude = CLIS.claude.argv(CLIS.claude.models[0]);
   assert.deepEqual(claude.slice(claude.indexOf('--effort'), claude.indexOf('--effort') + 2),
-    ['--effort', 'low']);
+    ['--effort', 'medium']);
 
   const codex = CLIS.codex.argv(CLIS.codex.models[0]);
-  assert.ok(codex.includes('model_reasoning_effort="low"'), codex.join(' '));
+  assert.ok(codex.includes('model_reasoning_effort="high"'), codex.join(' '));
 
   const agy = CLIS.agy.argv(CLIS.agy.models[0], 'x');
   assert.deepEqual(agy.slice(agy.indexOf('--effort'), agy.indexOf('--effort') + 2),

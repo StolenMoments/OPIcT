@@ -21,7 +21,7 @@ const codexVendor = (triple, arch) =>
 export const CLIS = {
   claude: {
     label: 'Claude Code',
-    models: ['claude-haiku-4-5-20251001'],
+    models: ['claude-sonnet-5'],
     promptMode: 'stdin',
     bin: () => win
       ? [join(home(), '.local', 'bin', 'claude.exe'),
@@ -30,7 +30,7 @@ export const CLIS = {
       : [join(home(), '.local', 'bin', 'claude'), '/usr/local/bin/claude', 'claude'],
     // --system-prompt로 Claude Code 기본 에이전트 시스템 프롬프트(툴 설명 등, 매 호출마다
     // 캐시 미스로 수천 토큰 낭비)를 대체 — 실제 지시문은 prompts.js의 프롬프트 본문에 이미 있다.
-    argv: (model) => ['--model', model, '--effort', 'low', '--output-format', 'json',
+    argv: (model) => ['--model', model, '--effort', 'medium', '--output-format', 'json',
       '--disallowedTools', '*', '--system-prompt', '', '-p'],
     // claude는 {result: "..."} 봉투로 출력 → result만 꺼냄. 실패 시 원문 그대로.
     extract: (stdout) => { try { return JSON.parse(stdout).result ?? stdout; } catch { return stdout; } },
@@ -45,7 +45,7 @@ export const CLIS = {
          'codex.cmd']
       : [join(home(), '.local', 'bin', 'codex'), '/usr/local/bin/codex', 'codex'],
     // -c 값의 따옴표는 codex의 TOML 파서가 요구한다. 셸을 거치지 않아야 그대로 도착한다.
-    argv: (model) => ['exec', '--model', model, '-c', 'model_reasoning_effort="low"',
+    argv: (model) => ['exec', '--model', model, '-c', 'model_reasoning_effort="high"',
       '--skip-git-repo-check', '-'],
     extract: (stdout) => stdout,
   },

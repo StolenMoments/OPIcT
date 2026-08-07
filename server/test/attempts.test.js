@@ -38,7 +38,7 @@ test('attempt pipeline: upload → transcribe → evaluate → done', async (t) 
   form.append('audio', new Blob([Buffer.from('fake-webm')], { type: 'audio/webm' }), 'a.webm');
   form.append('question_id', String(q.id));
   form.append('cli', 'claude');
-  form.append('model', 'claude-haiku-4-5-20251001');
+  form.append('model', 'claude-sonnet-5');
   const res = await app.inject({ method: 'POST', url: '/api/attempts', body: form });
   assert.equal(res.statusCode, 202);
 
@@ -57,7 +57,7 @@ test('POST /api/attempts rejects invalid question_id without leaving an orphaned
   form.append('audio', new Blob([Buffer.from('fake-webm')], { type: 'audio/webm' }), 'a.webm');
   form.append('question_id', '999999');
   form.append('cli', 'claude');
-  form.append('model', 'claude-haiku-4-5-20251001');
+  form.append('model', 'claude-sonnet-5');
   const res = await app.inject({ method: 'POST', url: '/api/attempts', body: form });
   assert.equal(res.statusCode, 400);
 });
@@ -81,7 +81,7 @@ test('attempt pipeline preserves raw_output when the CLI exits non-zero after wr
     form.append('audio', new Blob([Buffer.from('fake-webm')], { type: 'audio/webm' }), 'a.webm');
     form.append('question_id', String(q.id));
     form.append('cli', 'claude');
-    form.append('model', 'claude-haiku-4-5-20251001');
+    form.append('model', 'claude-sonnet-5');
     const res = await app.inject({ method: 'POST', url: '/api/attempts', body: form });
     assert.equal(res.statusCode, 202);
 
@@ -134,7 +134,7 @@ test('POST /api/attempts with a JSON body skips STT and evaluates the typed scri
   const res = await app.inject({
     method: 'POST',
     url: '/api/attempts',
-    payload: { question_id: q.id, script_text: scriptText, cli: 'claude', model: 'claude-haiku-4-5-20251001' },
+    payload: { question_id: q.id, script_text: scriptText, cli: 'claude', model: 'claude-sonnet-5' },
   });
   assert.equal(res.statusCode, 202);
 
@@ -160,7 +160,7 @@ test('POST /api/attempts with a JSON body rejects blank script_text with 400', a
   const res = await app.inject({
     method: 'POST',
     url: '/api/attempts',
-    payload: { question_id: q.id, script_text: '   ', cli: 'claude', model: 'claude-haiku-4-5-20251001' },
+    payload: { question_id: q.id, script_text: '   ', cli: 'claude', model: 'claude-sonnet-5' },
   });
   assert.equal(res.statusCode, 400);
 });
@@ -172,7 +172,7 @@ test('POST /api/attempts with a JSON body rejects a missing question_id with 400
   const res = await app.inject({
     method: 'POST',
     url: '/api/attempts',
-    payload: { script_text: 'hello', cli: 'claude', model: 'claude-haiku-4-5-20251001' },
+    payload: { script_text: 'hello', cli: 'claude', model: 'claude-sonnet-5' },
   });
   assert.equal(res.statusCode, 400);
 });

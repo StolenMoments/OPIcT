@@ -22,7 +22,7 @@ test('correction retry resets and reruns same record', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());
   const { id } = (await app.inject({ method: 'POST', url: '/api/corrections',
-    payload: { input_text: 'He go to school.', cli: 'claude', model: 'claude-haiku-4-5-20251001' } })).json();
+    payload: { input_text: 'He go to school.', cli: 'claude', model: 'claude-sonnet-5' } })).json();
 
   const completed = await waitDone(app, `/api/corrections/${id}`);
   assert.equal(completed.status, 'done');
@@ -49,7 +49,7 @@ test('attempt retry reruns the same record and serves its audio', async (t) => {
   form.append('audio', new Blob([Buffer.from('fake-webm')], { type: 'audio/webm' }), 'answer.webm');
   form.append('question_id', String(question.id));
   form.append('cli', 'claude');
-  form.append('model', 'claude-haiku-4-5-20251001');
+  form.append('model', 'claude-sonnet-5');
   const created = await app.inject({ method: 'POST', url: '/api/attempts', body: form });
   assert.equal(created.statusCode, 202);
   const id = created.json().id;
@@ -83,7 +83,7 @@ test('text-mode attempt retry resets to evaluating (not uploaded) and reruns wit
   const created = await app.inject({
     method: 'POST',
     url: '/api/attempts',
-    payload: { question_id: question.id, script_text: scriptText, cli: 'claude', model: 'claude-haiku-4-5-20251001' },
+    payload: { question_id: question.id, script_text: scriptText, cli: 'claude', model: 'claude-sonnet-5' },
   });
   assert.equal(created.statusCode, 202);
   const id = created.json().id;
@@ -122,7 +122,7 @@ test('audio route returns exact 404 body when an existing attempt file is missin
   form.append('audio', new Blob([Buffer.from('fake-webm')], { type: 'audio/webm' }), 'answer.webm');
   form.append('question_id', String(question.id));
   form.append('cli', 'claude');
-  form.append('model', 'claude-haiku-4-5-20251001');
+  form.append('model', 'claude-sonnet-5');
   const created = await app.inject({ method: 'POST', url: '/api/attempts', body: form });
   assert.equal(created.statusCode, 202);
 
