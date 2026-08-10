@@ -191,7 +191,7 @@ export default function CorrectPage({ visible = true }: { visible?: boolean }) {
               {busy && <Spinner aria-label="교정 처리 중" />}
               {busy ? "요청 처리 중" : "교정 요청"}
             </Button>
-            {row && <StatusBadge status={row.status} />}
+            {row && <StatusBadge status={row.status === 'verifying' ? 'running' : row.status} label={row.status === 'verifying' ? '검증 중' : undefined} />}
           </div>
         </section>
 

@@ -7,10 +7,14 @@ const PIPELINE_AUDIO = [
   { key: 'uploaded', label: '업로드' },
   { key: 'transcribing', label: '전사' },
   { key: 'evaluating', label: '평가' },
+  { key: 'verifying', label: '검증' },
 ] as const;
 
 // 텍스트로 입력한 시도는 업로드·전사 단계 없이 바로 평가로 시작하므로 그 두 단계를 생략한다.
-const PIPELINE_TEXT = [{ key: 'evaluating', label: '평가' }] as const;
+const PIPELINE_TEXT = [
+  { key: 'evaluating', label: '평가' },
+  { key: 'verifying', label: '검증' },
+] as const;
 
 type PipelineStage = { key: string; label: string };
 
@@ -18,6 +22,7 @@ const STATUS_KO: Record<string, string> = {
   uploaded: '대기 중',
   transcribing: '전사 중',
   evaluating: '평가 중',
+  verifying: '검증 중',
 };
 
 function safeParseResult(json: string | null): EvalResult | null {

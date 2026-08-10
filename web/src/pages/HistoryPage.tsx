@@ -53,6 +53,7 @@ function statusLabel(status: string): string {
     pending: '대기 중',
     transcribing: '전사 중',
     evaluating: '평가 중',
+    verifying: '검증 중',
     running: '처리 중',
     done: '완료',
     error: '오류',

@@ -25,6 +25,15 @@ describe('AttemptResult', () => {
     expect(screen.getByText(/평가 중/)).toBeTruthy();
   });
 
+  it('shows progress while verifying', () => {
+    render(
+      <AttemptResult
+        row={{ ...base, status: 'verifying', transcript: 't', result_json: null, error_message: null } as Attempt}
+      />,
+    );
+    expect(screen.getByText(/검증 중/)).toBeTruthy();
+  });
+
   it('renders feedback when done', () => {
     const result_json = JSON.stringify({
       summary_ko: '좋음',
