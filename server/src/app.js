@@ -15,13 +15,15 @@ import { attemptsRoutes } from './routes/attempts.js';
 import { retryRoutes } from './routes/retry.js';
 import { authRoutes } from './routes/auth.js';
 import { registerAuthHook, resolveAuthConfig } from './auth/auth-plugin.js';
+import { trainingRoutes } from './routes/training.js';
 
-export async function buildApp({ dbFile = 'data/opict.db', logger = false, auth } = {}) {
+export async function buildApp({ dbFile = 'data/opict.db', logger = false, auth, now = () => new Date() } = {}) {
   const authConfig = auth === undefined
     ? (process.env.NODE_ENV === 'production' ? resolveAuthConfig() : null)
     : resolveAuthConfig(auth);
   const app = Fastify({ logger, trustProxy: ['127.0.0.1', '::1'] });
   app.decorate('repos', createRepos(createDb(dbFile)));
+  app.decorate('now', now);
   registerAuthHook(app, authConfig);
   app.get('/api/health', async () => ({ ok: true }));
   await authRoutes(app, { auth: authConfig });
@@ -34,6 +36,7 @@ export async function buildApp({ dbFile = 'data/opict.db', logger = false, auth 
   await app.register(metaRoutes);
   await app.register(attemptsRoutes);
   await app.register(retryRoutes);
+  await app.register(trainingRoutes);
   app.addHook('onClose', async () => app.repos.close());
 
   const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));

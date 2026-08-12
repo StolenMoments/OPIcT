@@ -45,3 +45,69 @@ export type PaginatedResponse<T> = {
   limit: number;
   offset: number;
 };
+
+export type TrainingArea = {
+  passes: boolean;
+  feedback_ko: string;
+};
+
+export type TrainingVerdict = {
+  passes: boolean;
+  areas: {
+    meaning: TrainingArea;
+    grammar: TrainingArea;
+    naturalness: TrainingArea;
+    focus: TrainingArea;
+  };
+  hint_ko?: string;
+};
+
+export type TrainingAnswer = {
+  id: number;
+  session_item_id: number;
+  attempt_no: 1 | 2;
+  answer_text: string;
+  status: 'pending' | 'running' | 'done' | 'error';
+  verdict?: TrainingVerdict;
+  reference_en?: string;
+  error_message: string | null;
+  created_at: string;
+};
+
+export type TrainingItem = {
+  id: number;
+  sentence_id: number;
+  position: number;
+  status:
+    | 'pending'
+    | 'grading_first'
+    | 'awaiting_revision'
+    | 'first_error'
+    | 'grading_revision'
+    | 'revision_error'
+    | 'completed';
+  outcome: 'first_try_pass' | 'hint_pass' | 'review' | null;
+  source_type: 'attempt' | 'correction';
+  source_id: number;
+  source_sentence: string;
+  intent_ko: string;
+  focus_ko: string;
+  mastery_status: 'learning' | 'mastered';
+  reference_en?: string;
+  answers: TrainingAnswer[];
+};
+
+export type TrainingSession = {
+  id: number;
+  status: 'building' | 'ready' | 'in_progress' | 'completed' | 'empty' | 'error';
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+  items: TrainingItem[];
+  summary?: {
+    first_try_pass: number;
+    hint_pass: number;
+    review: number;
+  };
+};

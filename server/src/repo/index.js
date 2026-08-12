@@ -4,6 +4,7 @@ import { sentencesRepo } from './sentences.js';
 import { correctionsRepo } from './corrections.js';
 import { settingsRepo } from './settings.js';
 import { attemptsRepo } from './attempts.js';
+import { trainingRepo } from './training.js';
 
 export function createRepos(db) {
   return {
@@ -13,6 +14,7 @@ export function createRepos(db) {
     corrections: correctionsRepo(db),
     settings: settingsRepo(db),
     attempts: attemptsRepo(db),
+    training: trainingRepo(db),
     close: () => db.close(),
   };
 }

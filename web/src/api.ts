@@ -1,3 +1,17 @@
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  details: Record<string, unknown>;
+
+  constructor(message: string, status: number, code?: string, details: Record<string, unknown> = {}) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   // FormData bodies (multipart uploads) must let the browser set its own
   // content-type header with the multipart boundary; forcing
@@ -10,6 +24,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(body?.error ?? res.statusText);
+  if (!res.ok) {
+    const { error, code, ...details } = body && typeof body === 'object' ? body : {};
+    throw new ApiError(error ?? res.statusText, res.status, code, details);
+  }
   return body as T;
 }

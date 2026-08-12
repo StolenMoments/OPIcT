@@ -12,6 +12,8 @@ import ErrorAlert from "@/components/ui/ErrorAlert";
 import ActionEmpty from "@/components/ui/ActionEmpty";
 import ListSkeleton from "@/components/ui/ListSkeleton";
 import type { Correction, CorrectionResult } from "../types";
+import TrainingPage from "./TrainingPage";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function safeParseResult(json: string | null): CorrectionResult | null {
   if (!json) return null;
@@ -74,7 +76,7 @@ function SaveToNote({ text }: { text: string }) {
   );
 }
 
-export default function CorrectPage({ visible = true }: { visible?: boolean }) {
+function FreeCorrection({ visible = true }: { visible?: boolean }) {
   const [err, setErr] = useState<string | null>(null);
   const guard = useCallback(async (fn: () => Promise<void>) => {
     try {
@@ -152,12 +154,7 @@ export default function CorrectPage({ visible = true }: { visible?: boolean }) {
     });
 
   return (
-    <div className="page">
-      <div className="page-heading">
-        <h2>문장 교정</h2>
-        <p>원문과 교정 신호를 나란히 비교하고 표현을 노트로 보냅니다.</p>
-      </div>
-
+    <>
       {err && <ErrorAlert message={err} onDismiss={() => setErr(null)} />}
 
       <div className="correct-layout">
@@ -254,6 +251,36 @@ export default function CorrectPage({ visible = true }: { visible?: boolean }) {
           )}
         </section>
       </div>
+    </>
+  );
+}
+
+export default function CorrectPage({
+  visible = true,
+  onOpenSettings = () => {},
+}: {
+  visible?: boolean;
+  onOpenSettings?: () => void;
+}) {
+  const [mode, setMode] = useState<'training' | 'correction'>('training');
+  return (
+    <div className="page sentence-page">
+      <div className="page-heading">
+        <h2>문장</h2>
+        <p>기록에서 만든 오늘의 문장을 훈련하거나, 원하는 문장을 바로 교정합니다.</p>
+      </div>
+      <Tabs value={mode} onValueChange={(value) => setMode(value as 'training' | 'correction')}>
+        <TabsList variant="line" aria-label="문장 학습 방식">
+          <TabsTrigger value="training">훈련</TabsTrigger>
+          <TabsTrigger value="correction">자유 교정</TabsTrigger>
+        </TabsList>
+        <TabsContent value="training" keepMounted>
+          <TrainingPage visible={visible && mode === 'training'} onOpenCorrection={() => setMode('correction')} onOpenSettings={onOpenSettings} />
+        </TabsContent>
+        <TabsContent value="correction" keepMounted>
+          <FreeCorrection visible={visible && mode === 'correction'} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

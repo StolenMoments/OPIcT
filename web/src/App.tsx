@@ -5,7 +5,7 @@ import {
   Mic2,
   Radio,
   Settings,
-  Sparkles,
+  Languages,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -24,7 +24,7 @@ export type TabKey = "practice" | "correct" | "notes" | "history" | "settings";
 
 const TABS = [
   { key: "practice", label: "연습", icon: Mic2 },
-  { key: "correct", label: "교정", icon: Sparkles },
+  { key: "correct", label: "문장", icon: Languages },
   { key: "notes", label: "노트", icon: BookOpenText },
   { key: "history", label: "기록", icon: History },
   { key: "settings", label: "설정", icon: Settings },
@@ -117,7 +117,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => void }) {
           <PracticePage visible={tab === "practice"} />
         </div>
         <div hidden={tab !== "correct"}>
-          <CorrectPage visible={tab === "correct"} />
+          <CorrectPage visible={tab === "correct"} onOpenSettings={() => setTab("settings")} />
         </div>
         <div hidden={tab !== "notes"}>
           <NotesPage />

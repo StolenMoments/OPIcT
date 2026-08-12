@@ -710,6 +710,272 @@
   display: grid;
   gap: 1rem;
 }
+.sentence-page [data-slot="tabs-list"] {
+  width: 100%;
+  justify-content: flex-start;
+  border-bottom: 1px solid var(--border);
+}
+.sentence-page [data-slot="tabs-trigger"] {
+  flex: 0 0 auto;
+  min-width: 6rem;
+  padding-inline: 0.75rem;
+  font-size: 0.875rem;
+}
+.sentence-page [data-slot="tabs-content"] {
+  padding-top: 1rem;
+}
+.training-start,
+.training-loading {
+  min-height: 18rem;
+}
+.training-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  text-align: left;
+}
+.training-loading > [data-slot="spinner"] {
+  color: var(--primary);
+}
+.training-loading h3,
+.training-loading p,
+.training-complete h3,
+.training-complete p {
+  margin: 0;
+}
+.training-loading p,
+.training-complete p {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+.training-flow {
+  display: grid;
+  gap: 1rem;
+}
+.training-progress {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.training-progress progress {
+  width: 100%;
+  height: 0.3rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  appearance: none;
+  background: var(--muted);
+}
+.training-progress progress::-webkit-progress-bar {
+  background: var(--muted);
+}
+.training-progress progress::-webkit-progress-value {
+  background: var(--primary);
+}
+.training-progress progress::-moz-progress-bar {
+  background: var(--primary);
+}
+.training-layout {
+  display: grid;
+  gap: 1rem;
+}
+.training-prompt,
+.training-feedback {
+  align-content: start;
+}
+.training-prompt__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+.training-prompt__meta span:last-child {
+  color: var(--primary);
+}
+.training-intent,
+.training-focus {
+  display: grid;
+  gap: 0.35rem;
+}
+.training-intent > span,
+.training-focus > span {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.training-intent p,
+.training-focus p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.training-intent p {
+  max-width: 68ch;
+  font-size: 1.2rem;
+  font-weight: 620;
+  line-height: 1.6;
+}
+.training-focus {
+  padding-block: 0.75rem;
+  border-block: 1px solid var(--border);
+}
+.training-focus p {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+.training-panel-heading {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.training-verdict,
+.training-area-list__signal {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.training-verdict svg,
+.training-area-list__signal svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+.training-verdict--pass,
+.training-area-list__signal--pass {
+  color: var(--success);
+}
+.training-verdict--retry,
+.training-area-list__signal--retry {
+  color: var(--destructive);
+}
+.training-feedback__body {
+  display: grid;
+  gap: 1.5rem;
+}
+.training-area-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.training-area-list__item {
+  display: grid;
+  gap: 0.35rem;
+  padding-block: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.training-area-list__item > span:last-child {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+.training-hint {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: var(--tally-weak);
+}
+.training-hint > svg {
+  width: 1rem;
+  color: var(--primary);
+}
+.training-hint strong {
+  font-size: 0.8125rem;
+}
+.training-hint p {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+}
+.training-comparison {
+  display: grid;
+  gap: 0;
+}
+.training-comparison h3 {
+  margin-bottom: 0.5rem;
+}
+.training-comparison__row {
+  display: grid;
+  gap: 0.25rem;
+  padding-block: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.training-comparison__row > span {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+.training-comparison__row p {
+  max-width: 68ch;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.training-comparison__row--reference p {
+  color: var(--success);
+  font-weight: 650;
+}
+.training-comparison__note {
+  margin: 0.75rem 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+.training-inline-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--destructive);
+  font-size: 0.8125rem;
+}
+.training-inline-error svg {
+  width: 1rem;
+}
+.training-complete {
+  min-height: 22rem;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.training-complete__mark {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  place-items: center;
+  background: color-mix(in oklch, var(--success) 16%, transparent);
+  color: var(--success);
+}
+.training-complete__mark svg {
+  width: 1.5rem;
+}
+.training-summary {
+  display: grid;
+  width: min(100%, 30rem);
+  margin: 0;
+}
+.training-summary > div {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.training-summary dt {
+  color: var(--muted-foreground);
+}
+.training-summary dd {
+  margin: 0;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
 .save-to-note {
   display: grid;
   gap: 0.5rem;
@@ -855,6 +1121,16 @@
   .correct-layout {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-items: start;
+  }
+  .training-layout {
+    grid-template-columns: minmax(0, 1.15fr) minmax(20rem, 0.85fr);
+    align-items: start;
+  }
+  .training-feedback {
+    position: sticky;
+    top: calc(var(--header-height) + 2rem);
+    max-height: calc(100svh - var(--header-height) - var(--nav-height) - 4rem);
+    overflow: auto;
   }
   .settings-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

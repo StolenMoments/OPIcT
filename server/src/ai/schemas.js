@@ -66,9 +66,67 @@ export const evaluationResultSchema = {
   additionalProperties: false,
 };
 
+const trainingAreaSchema = {
+  type: 'object',
+  properties: {
+    passes: { type: 'boolean' },
+    feedback_ko: { type: 'string', minLength: 1 },
+  },
+  required: ['passes', 'feedback_ko'],
+  additionalProperties: false,
+};
+
+export const trainingMaterialSchema = {
+  type: 'object',
+  properties: {
+    items: {
+      type: 'array',
+      maxItems: 20,
+      items: {
+        type: 'object',
+        properties: {
+          source_type: { type: 'string', enum: ['attempt', 'correction'] },
+          source_id: { type: 'integer', minimum: 1 },
+          source_sentence: { type: 'string', minLength: 1 },
+          intent_ko: { type: 'string', minLength: 1 },
+          reference_en: { type: 'string', minLength: 1 },
+          focus_ko: { type: 'string', minLength: 1 },
+        },
+        required: ['source_type', 'source_id', 'source_sentence', 'intent_ko', 'reference_en', 'focus_ko'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['items'],
+  additionalProperties: false,
+};
+
+export const trainingGradeSchema = {
+  type: 'object',
+  properties: {
+    passes: { type: 'boolean' },
+    areas: {
+      type: 'object',
+      properties: {
+        meaning: trainingAreaSchema,
+        grammar: trainingAreaSchema,
+        naturalness: trainingAreaSchema,
+        focus: trainingAreaSchema,
+      },
+      required: ['meaning', 'grammar', 'naturalness', 'focus'],
+      additionalProperties: false,
+    },
+    hint_ko: { type: 'string' },
+  },
+  required: ['passes', 'areas', 'hint_ko'],
+  additionalProperties: false,
+};
+
 export const outputSchemas = {
   correction: correctionResultSchema,
   evaluation: evaluationResultSchema,
+  trainingMaterial: trainingMaterialSchema,
+  trainingGrade: trainingGradeSchema,
 };
 
 // Short aliases keep the schema names convenient for callers that only need one result type.

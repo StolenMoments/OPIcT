@@ -29,6 +29,7 @@ describe('CorrectPage default cli/model', () => {
     });
 
     const { rerender } = render(<CorrectPage visible />);
+    fireEvent.click(screen.getByRole('tab', { name: '자유 교정' }));
     const cliTrigger = await screen.findByRole('combobox', { name: 'CLI 선택' });
     await waitFor(() => expect(cliTrigger).toHaveTextContent('Codex'));
 
@@ -61,6 +62,7 @@ describe('CorrectPage default cli/model', () => {
     });
 
     const { rerender } = render(<CorrectPage visible />);
+    fireEvent.click(screen.getByRole('tab', { name: '자유 교정' }));
     const cliTrigger = await screen.findByRole('combobox', { name: 'CLI 선택' });
     await waitFor(() => expect(cliTrigger).toHaveTextContent('Codex'));
 
@@ -86,8 +88,27 @@ describe('CorrectPage default cli/model', () => {
     });
 
     render(<CorrectPage />);
+    fireEvent.click(screen.getByRole('tab', { name: '자유 교정' }));
 
     expect(await screen.findByRole('combobox', { name: 'CLI 선택' })).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: '모델 선택' })).not.toBeInTheDocument();
+  });
+
+  it('preserves an unfinished correction while switching between sentence modes', async () => {
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === '/settings') return {};
+      if (path === '/meta/clis') return [{ name: 'codex', label: 'Codex', models: ['gpt-5'] }];
+      return null;
+    });
+    render(<CorrectPage />);
+    fireEvent.click(screen.getByRole('tab', { name: '자유 교정' }));
+    fireEvent.change(await screen.findByRole('textbox', { name: '교정받을 영어 문장' }), {
+      target: { value: 'Keep this draft.' },
+    });
+
+    fireEvent.click(screen.getByRole('tab', { name: '훈련' }));
+    fireEvent.click(screen.getByRole('tab', { name: '자유 교정' }));
+
+    expect(screen.getByRole('textbox', { name: '교정받을 영어 문장' })).toHaveValue('Keep this draft.');
   });
 });

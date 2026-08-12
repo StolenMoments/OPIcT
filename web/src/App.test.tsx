@@ -106,13 +106,15 @@ describe("App authentication gate", () => {
     });
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "교정" }));
+    fireEvent.click(await screen.findByRole("button", { name: "문장" }));
+    fireEvent.click(screen.getByRole("tab", { name: "자유 교정" }));
     fireEvent.change(await screen.findByLabelText("교정받을 영어 문장"), {
       target: { value: "I went there yesterday." },
     });
 
     fireEvent.click(screen.getByRole("button", { name: "노트" }));
-    fireEvent.click(screen.getByRole("button", { name: "교정" }));
+    fireEvent.click(screen.getByRole("button", { name: "문장" }));
+    fireEvent.click(screen.getByRole("tab", { name: "자유 교정" }));
 
     expect(await screen.findByLabelText("교정받을 영어 문장")).toHaveValue(
       "I went there yesterday.",
