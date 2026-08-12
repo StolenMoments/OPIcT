@@ -48,7 +48,14 @@ describe('CorrectPage default cli/model', () => {
           { name: 'codex', label: 'Codex', models: ['gpt-5'] },
           { name: 'claude', label: 'Claude', models: ['claude-haiku-4-5-20251001'] },
         ];
-      if (path === '/corrections' && init?.method === 'POST') return { id: 1 };
+      if (path === '/corrections' && init?.method === 'POST') {
+        expect(JSON.parse(init.body as string)).toMatchObject({
+          input_text: 'I go to school yesterday.',
+          cli: 'codex',
+          model: 'gpt-5',
+        });
+        return { id: 1 };
+      }
       if (path === '/corrections/1') return { id: 1, status: 'evaluating' };
       return null;
     });
@@ -69,5 +76,18 @@ describe('CorrectPage default cli/model', () => {
 
     await Promise.resolve();
     expect(cliTrigger).toHaveTextContent('Codex');
+  });
+
+  it('keeps CLI selection but hides model selection on the correction screen', async () => {
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === '/settings') return { default_cli: 'codex', default_model_codex: 'gpt-5' };
+      if (path === '/meta/clis') return [{ name: 'codex', label: 'Codex', models: ['gpt-5'] }];
+      return null;
+    });
+
+    render(<CorrectPage />);
+
+    expect(await screen.findByRole('combobox', { name: 'CLI 선택' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: '모델 선택' })).not.toBeInTheDocument();
   });
 });

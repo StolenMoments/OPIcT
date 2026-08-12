@@ -273,6 +273,7 @@ export default function PracticePage({ visible = true }: { visible?: boolean }) 
             <CliPicker
               cli={cli}
               model={model}
+              showModel={false}
               onChange={(c, m) => {
                 setCli(c);
                 setModel(m);

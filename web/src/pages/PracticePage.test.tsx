@@ -76,11 +76,13 @@ describe('PracticePage representative recording flow', () => {
       if (path === '/questions?category_id=1') {
         return [{ id: 7, category_id: 1, text: 'Tell me about your day.', note: null, created_at: '' }];
       }
-      if (path === '/meta/clis') return [{ name: 'codex', label: 'Codex', models: ['gpt'] }];
+      if (path === '/meta/clis') return [{ name: 'codex', label: 'Codex', models: ['gpt-5', 'gpt-4'] }];
       if (path === '/attempts' && init?.method === 'POST') {
         expect(JSON.parse(init.body as string)).toMatchObject({
           question_id: 7,
           script_text: 'I had a quiet day at home.',
+          cli: 'codex',
+          model: 'gpt-5',
         });
         return new Promise<{ id: number }>((resolve) => {
           finishSubmit = resolve;
@@ -103,6 +105,27 @@ describe('PracticePage representative recording flow', () => {
     expect(await screen.findByRole('status', { name: '답변 신호 전송 중' })).toBeInTheDocument();
 
     finishSubmit?.({ id: 91 });
+  });
+
+  it('keeps CLI selection but hides model selection on the practice screen', async () => {
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === '/settings') return { default_cli: 'codex', default_model_codex: 'gpt-5' };
+      if (path === '/categories') return [{ id: 1, type: 'survey', name: '일상', sort_order: 0 }];
+      if (path === '/questions?category_id=1') {
+        return [{ id: 7, category_id: 1, text: 'Tell me about your day.', note: null, created_at: '' }];
+      }
+      if (path === '/meta/clis') return [{ name: 'codex', label: 'Codex', models: ['gpt-5'] }];
+      return null;
+    });
+
+    render(<PracticePage />);
+
+    fireEvent.click(await screen.findByRole('combobox', { name: '카테고리 선택' }));
+    fireEvent.click(await screen.findByRole('option', { name: '[서베이] 일상' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Tell me about your day.' }));
+
+    expect(await screen.findByRole('combobox', { name: 'CLI 선택' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: '모델 선택' })).not.toBeInTheDocument();
   });
 
   it('defaults new questions to the saved default input mode', async () => {
