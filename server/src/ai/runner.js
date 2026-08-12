@@ -1,12 +1,15 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { CLIS } from './clis.js';
 
 // CLI가 프로젝트 파일을 읽지 못하도록 빈 샌드박스 폴더에서 실행
 const sandbox = join(tmpdir(), 'opict-sandbox');
 mkdirSync(sandbox, { recursive: true });
+const schemaDir = join(tmpdir(), 'opict-schemas');
+mkdirSync(schemaDir, { recursive: true });
 
 const resolved = new Map();
 
@@ -19,10 +22,25 @@ function resolveBin(cli, def) {
   return resolved.get(cli);
 }
 
+function schemaFileFor(schema) {
+  if (typeof schema === 'string' && isAbsolute(schema)) return schema;
+  const serialized = JSON.stringify(schema);
+  const digest = createHash('sha256').update(serialized).digest('hex');
+  const file = join(schemaDir, `${digest}.json`);
+  if (!existsSync(file)) writeFileSync(file, `${serialized}\n`, 'utf8');
+  return file;
+}
+
+function normalizeOutput(value) {
+  if (typeof value === 'string') return value;
+  if (value === undefined || value === null) return '';
+  return JSON.stringify(value);
+}
+
 /**
  * 실제로 spawn할 명령·인자·옵션을 만든다. 테스트에서 조립 결과만 검증할 수 있도록 분리.
  */
-export function buildInvocation({ cli, model, prompt, stub }) {
+export function buildInvocation({ cli, model, prompt, stub, outputSchema, schema, schemaPath }) {
   if (stub) {
     // 테스트 스텁은 항상 stdin으로 프롬프트를 받는다.
     return { cmd: process.execPath, args: [stub], opts: {}, stdinPrompt: prompt };
@@ -33,16 +51,24 @@ export function buildInvocation({ cli, model, prompt, stub }) {
   // 프롬프트의 따옴표·개행에서 인자 경계가 깨지고, 프롬프트 내용이 명령줄로 새어나간다.
   const opts = { shell: /\.(cmd|bat)$/i.test(cmd), windowsHide: true };
 
+  const outputSchemaContext = outputSchema ?? schema;
+  const resolvedSchemaPath = schemaPath ?? (outputSchemaContext ? schemaFileFor(outputSchemaContext) : undefined);
+  const args = def.argv(model, {
+    outputSchema: cli === 'claude' ? outputSchemaContext : undefined,
+    schemaPath: cli === 'codex' ? resolvedSchemaPath : undefined,
+    prompt,
+  });
+
   return def.promptMode === 'argv'
-    ? { cmd, args: def.argv(model, prompt), opts, stdinPrompt: null }
-    : { cmd, args: def.argv(model), opts, stdinPrompt: prompt };
+    ? { cmd, args, opts, stdinPrompt: null }
+    : { cmd, args, opts, stdinPrompt: prompt };
 }
 
-export function runCli({ cli, model, prompt, timeoutMs = 180_000 }) {
+export function runCli({ cli, model, prompt, timeoutMs = 180_000, outputSchema, schema }) {
   const def = CLIS[cli];
   if (!def) return Promise.reject(new Error(`알 수 없는 CLI: ${cli}`));
   const { cmd, args, opts, stdinPrompt } = buildInvocation({
-    cli, model, prompt, stub: process.env.OPICT_CLI_STUB,
+    cli, model, prompt, stub: process.env.OPICT_CLI_STUB, outputSchema, schema,
   });
 
   return new Promise((resolve, reject) => {
@@ -78,7 +104,7 @@ export function runCli({ cli, model, prompt, timeoutMs = 180_000 }) {
         e.rawOutput = out;
         return settleReject(e);
       }
-      settleResolve(def.extract(out));
+      settleResolve(normalizeOutput(def.extract(out)));
     });
     if (stdinPrompt !== null) child.stdin.write(stdinPrompt, 'utf-8');
     child.stdin.end(); // agy Windows hang 대응 — 반드시 즉시 닫기

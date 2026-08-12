@@ -9,6 +9,9 @@ const STUB = fileURLToPath(new URL('./fixtures/stub-cli.js', import.meta.url));
 const STUB_FAIL = fileURLToPath(new URL('./fixtures/stub-cli-fail.js', import.meta.url));
 const STUB_VERIFICATION = fileURLToPath(new URL('./fixtures/stub-cli-verification.js', import.meta.url));
 const STUB_BAD_VERIFICATION = fileURLToPath(new URL('./fixtures/stub-cli-bad-verification.js', import.meta.url));
+const STUB_RETRY_INITIAL = fileURLToPath(new URL('./fixtures/stub-cli-retry-initial.js', import.meta.url));
+const STUB_RETRY_VERIFICATION = fileURLToPath(new URL('./fixtures/stub-cli-retry-verification.js', import.meta.url));
+const STUB_BAD_AFTER_RETRY = fileURLToPath(new URL('./fixtures/stub-cli-bad-after-retry.js', import.meta.url));
 
 process.env.OPICT_CLI_STUB = STUB;
 process.env.OPICT_STT_STUB = fileURLToPath(new URL('./fixtures/stub-stt.js', import.meta.url));
@@ -72,12 +75,50 @@ test('attempt pipeline saves the second CLI verification result', async (t) => {
   }
 });
 
-test('attempt treats an unparseable verification result as an error and preserves its raw output', async (t) => {
+test('attempt retries an invalid first result once and saves the repaired result', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());
   const cat = (await app.inject({ method: 'POST', url: '/api/categories', payload: { type: 'survey', name: '조깅' } })).json();
   const q = (await app.inject({ method: 'POST', url: '/api/questions', payload: { category_id: cat.id, text: 'Tell me about your jogging routine.' } })).json();
-  process.env.OPICT_CLI_STUB = STUB_BAD_VERIFICATION;
+  process.env.OPICT_CLI_STUB = STUB_RETRY_INITIAL;
+  try {
+    const res = await app.inject({ method: 'POST', url: '/api/attempts',
+      payload: { question_id: q.id, script_text: 'I go yesterday.', cli: 'claude', model: 'claude-sonnet-5' } });
+    const row = await waitDone(app, `/api/attempts/${res.json().id}`);
+
+    assert.equal(row.status, 'done');
+    assert.equal(JSON.parse(row.result_json).corrected_answer, 'I went yesterday.');
+    assert.match(row.raw_output, /\[1차 재시도\]/);
+  } finally {
+    process.env.OPICT_CLI_STUB = STUB;
+  }
+});
+
+test('attempt retries an invalid verification result once and saves the repaired result', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const cat = (await app.inject({ method: 'POST', url: '/api/categories', payload: { type: 'survey', name: '조깅' } })).json();
+  const q = (await app.inject({ method: 'POST', url: '/api/questions', payload: { category_id: cat.id, text: 'Tell me about your jogging routine.' } })).json();
+  process.env.OPICT_CLI_STUB = STUB_RETRY_VERIFICATION;
+  try {
+    const res = await app.inject({ method: 'POST', url: '/api/attempts',
+      payload: { question_id: q.id, script_text: 'I go yesterday.', cli: 'claude', model: 'claude-sonnet-5' } });
+    const row = await waitDone(app, `/api/attempts/${res.json().id}`);
+
+    assert.equal(row.status, 'done');
+    assert.equal(JSON.parse(row.result_json).corrected_answer, 'I went yesterday.');
+    assert.match(row.raw_output, /\[검증 재시도\]/);
+  } finally {
+    process.env.OPICT_CLI_STUB = STUB;
+  }
+});
+
+test('attempt leaves result_json empty after the verification retry also fails', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const cat = (await app.inject({ method: 'POST', url: '/api/categories', payload: { type: 'survey', name: '조깅' } })).json();
+  const q = (await app.inject({ method: 'POST', url: '/api/questions', payload: { category_id: cat.id, text: 'Tell me about your jogging routine.' } })).json();
+  process.env.OPICT_CLI_STUB = STUB_BAD_AFTER_RETRY;
   try {
     const res = await app.inject({
       method: 'POST',
@@ -89,7 +130,10 @@ test('attempt treats an unparseable verification result as an error and preserve
     assert.equal(row.status, 'error');
     assert.equal(row.result_json, null);
     assert.match(row.error_message, /결과 검증 JSON 파싱 실패/);
-    assert.match(row.raw_output, /not valid JSON from verification/);
+    assert.match(row.error_message, /자동 재시도 실패/);
+    assert.match(row.raw_output, /\[1차\]/);
+    assert.match(row.raw_output, /\[검증\]/);
+    assert.match(row.raw_output, /\[검증 재시도\]/);
   } finally {
     process.env.OPICT_CLI_STUB = STUB;
   }

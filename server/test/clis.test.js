@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { isAbsolute } from 'node:path';
 import { CLIS } from '../src/ai/clis.js';
 import { buildInvocation } from '../src/ai/runner.js';
+import { evaluationResultSchema } from '../src/ai/schemas.js';
 
 test('CLI별 effort로 호출된다', () => {
   const claude = CLIS.claude.argv(CLIS.claude.models[0]);
@@ -56,4 +58,51 @@ test('스텁이 설정되면 어떤 CLI든 stdin 방식으로 실행된다', () 
   assert.equal(inv.cmd, process.execPath);
   assert.deepEqual(inv.args, ['/tmp/stub.js']);
   assert.equal(inv.stdinPrompt, 'p');
+});
+
+test('Claude receives the native JSON schema option', () => {
+  const inv = buildInvocation({
+    cli: 'claude',
+    model: CLIS.claude.models[0],
+    prompt: 'p',
+    outputSchema: evaluationResultSchema,
+  });
+  const index = inv.args.indexOf('--json-schema');
+
+  assert.notEqual(index, -1);
+  assert.deepEqual(JSON.parse(inv.args[index + 1]), evaluationResultSchema);
+});
+
+test('Codex receives an absolute output schema file', () => {
+  const inv = buildInvocation({
+    cli: 'codex',
+    model: CLIS.codex.models[0],
+    prompt: 'p',
+    outputSchema: evaluationResultSchema,
+  });
+  const index = inv.args.indexOf('--output-schema');
+
+  assert.notEqual(index, -1);
+  assert.ok(isAbsolute(inv.args[index + 1]));
+});
+
+test('Antigravity does not receive a native schema option', () => {
+  const inv = buildInvocation({
+    cli: 'agy',
+    model: CLIS.agy.models[0],
+    prompt: 'p',
+    outputSchema: evaluationResultSchema,
+  });
+
+  assert.ok(!inv.args.includes('--json-schema'));
+  assert.ok(!inv.args.includes('--output-schema'));
+});
+
+test('Claude result envelopes normalize string and object results to JSON input', () => {
+  const objectResult = CLIS.claude.extract(JSON.stringify({ result: { ...evaluationResultSchema } }));
+  const stringResult = CLIS.claude.extract(JSON.stringify({ result: JSON.stringify({ ok: true }) }));
+
+  assert.equal(typeof objectResult, 'string');
+  assert.deepEqual(JSON.parse(objectResult), evaluationResultSchema);
+  assert.deepEqual(JSON.parse(stringResult), { ok: true });
 });

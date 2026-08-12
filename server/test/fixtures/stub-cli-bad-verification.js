@@ -7,14 +7,18 @@ process.stdin.on('end', () => {
     console.log('not valid JSON from verification');
     return;
   }
-  console.log(JSON.stringify({
-    corrected: 'I went yesterday.',
-    alternatives: [],
-    explanation_ko: '초안',
-    summary_ko: '초안',
-    strengths_ko: [],
-    improvements_ko: [],
-    recommended_expressions: [],
-    corrected_answer: 'I went yesterday.',
-  }));
+  const evaluation = input.includes('OPIc rater');
+  console.log(JSON.stringify(evaluation
+    ? {
+        summary_ko: '초안',
+        strengths_ko: [],
+        improvements_ko: [],
+        recommended_expressions: [],
+        corrected_answer: 'I went yesterday.',
+      }
+    : {
+        corrected: 'I went yesterday.',
+        alternatives: [],
+        explanation_ko: '초안',
+      }));
 });

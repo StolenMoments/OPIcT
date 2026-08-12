@@ -24,10 +24,17 @@ export function attemptsRepo(db) {
       ).all(...params, limit, offset);
       return { items, total };
     },
-    setStatus(id, { status, transcript = null, result_json = null, raw_output = null, error_message = null }) {
-      db.prepare(`UPDATE attempts SET status=?, transcript=COALESCE(?,transcript),
-        result_json=COALESCE(?,result_json), raw_output=COALESCE(?,raw_output), error_message=? WHERE id=?`)
-        .run(status, transcript, result_json, raw_output, error_message, id);
+    setStatus(id, changes) {
+      const fields = ['status=?'];
+      const values = [changes.status];
+      for (const field of ['transcript', 'result_json', 'raw_output', 'error_message']) {
+        if (Object.hasOwn(changes, field)) {
+          fields.push(`${field}=?`);
+          values.push(changes[field]);
+        }
+      }
+      values.push(id);
+      db.prepare(`UPDATE attempts SET ${fields.join(', ')} WHERE id=?`).run(...values);
       return this.get(id);
     },
   };
