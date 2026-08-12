@@ -25,6 +25,13 @@ const validEvaluation = {
   improvements_ko: ['시제를 일관되게 사용하세요.'],
   recommended_expressions: [{ text: 'clear my head', note_ko: '머리를 식히다' }],
   corrected_answer: 'I went to the park yesterday.',
+  correction_notes: [
+    {
+      before: 'go',
+      after: 'went',
+      reason_ko: 'yesterday가 과거 시점을 나타내므로 go를 과거형 went로 고칩니다.',
+    },
+  ],
 };
 
 const validCorrection = {
@@ -49,6 +56,32 @@ test('rejects a syntactically valid result with malformed nested item types', ()
   assert.match(result.error, /Schema/);
 });
 
+test('accepts correction notes for replacements, insertions, deletions, and no changes', () => {
+  const result = parseAndValidateJson(JSON.stringify({
+    ...validEvaluation,
+    correction_notes: [
+      { before: 'go', after: 'went', reason_ko: '과거 시제입니다.' },
+      { before: '', after: 'really ', reason_ko: '강조 표현을 추가합니다.' },
+      { before: 'very ', after: '', reason_ko: '불필요한 수식어를 삭제합니다.' },
+    ],
+  }), evaluationResultSchema);
+  const empty = parseAndValidateJson(JSON.stringify({ ...validEvaluation, correction_notes: [] }), evaluationResultSchema);
+
+  assert.equal(result.ok, true);
+  assert.equal(empty.ok, true);
+  assert.deepEqual(empty.value.correction_notes, []);
+});
+
+test('rejects a malformed nested correction note item', () => {
+  const result = parseAndValidateJson(JSON.stringify({
+    ...validEvaluation,
+    correction_notes: [{ before: 'go', after: 42, reason_ko: '설명' }],
+  }), evaluationResultSchema);
+
+  assert.equal(result.ok, false);
+  assert.match(result.error, /Schema/);
+});
+
 test('rejects an extra top-level field', () => {
   const result = parseAndValidateJson(JSON.stringify({ ...validEvaluation, extra: true }), evaluationResultSchema);
 
@@ -62,6 +95,7 @@ test('accepts complete evaluation and correction results with empty arrays', () 
     strengths_ko: [],
     improvements_ko: [],
     recommended_expressions: [],
+    correction_notes: [],
   }), evaluationResultSchema);
   const correction = parseAndValidateJson(JSON.stringify({ ...validCorrection, alternatives: [] }), correctionResultSchema);
 
@@ -70,6 +104,7 @@ test('accepts complete evaluation and correction results with empty arrays', () 
     strengths_ko: [],
     improvements_ko: [],
     recommended_expressions: [],
+    correction_notes: [],
   });
   assert.deepEqual(correction.value, { ...validCorrection, alternatives: [] });
 });

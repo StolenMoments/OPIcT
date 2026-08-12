@@ -8,6 +8,17 @@ const expressionItemSchema = {
   additionalProperties: false,
 };
 
+export const correctionNoteSchema = {
+  type: 'object',
+  properties: {
+    before: { type: 'string' },
+    after: { type: 'string' },
+    reason_ko: { type: 'string', minLength: 1 },
+  },
+  required: ['before', 'after', 'reason_ko'],
+  additionalProperties: false,
+};
+
 export const correctionResultSchema = {
   type: 'object',
   properties: {
@@ -39,6 +50,10 @@ export const evaluationResultSchema = {
       items: expressionItemSchema,
     },
     corrected_answer: { type: 'string' },
+    correction_notes: {
+      type: 'array',
+      items: correctionNoteSchema,
+    },
   },
   required: [
     'summary_ko',
@@ -46,6 +61,7 @@ export const evaluationResultSchema = {
     'improvements_ko',
     'recommended_expressions',
     'corrected_answer',
+    'correction_notes',
   ],
   additionalProperties: false,
 };

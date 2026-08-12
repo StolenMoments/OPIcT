@@ -19,6 +19,10 @@ test('evaluation prompt translates Korean segments in corrected_answer', () => {
   assert.match(prompt, /Use corrected_answer only as a reference for improved English wording, not as the answer being evaluated/i);
   assert.match(prompt, /Never use the words "Korean", "한국어", or "한국어 문장" in summary_ko, strengths_ko, improvements_ko/i);
   assert.match(prompt, /describe the needed English expression or grammar correction directly/i);
+  assert.match(prompt, /"correction_notes"/);
+  assert.match(prompt, /before.*after.*reason_ko/i);
+  assert.match(prompt, /meaningful changes/i);
+  assert.match(prompt, /written in Korean/i);
 });
 
 test('verification prompts include the original context, candidate JSON, and output contract', () => {
@@ -32,6 +36,8 @@ test('verification prompts include the original context, candidate JSON, and out
   assert.match(evaluation, /Question: Tell me about your day\./);
   assert.match(evaluation, /Transcribed answer: I go yesterday\./);
   assert.match(evaluation, /"summary_ko":"초안"/);
+  assert.match(evaluation, /"correction_notes"/);
+  assert.match(evaluation, /meaningful changes/i);
 });
 
 test('all primary prompts use valid JSON examples rather than pseudo JSON types', () => {
@@ -60,4 +66,6 @@ test('repair prompts include original context, validation errors, and untrusted 
   assert.match(evaluation, /Original question \(data\): Tell me about your day\./);
   assert.match(evaluation, /Original transcribed answer \(data\): I go yesterday\./);
   assert.match(evaluation, /bad output/);
+  assert.match(evaluation, /"correction_notes"/);
+  assert.match(evaluation, /meaningful changes/i);
 });

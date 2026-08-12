@@ -11,6 +11,7 @@ process.stdin.on('end', () => {
         improvements_ko: ['디테일 추가'],
         recommended_expressions: [{ text: 'clear my head', note_ko: '머리를 식히다' }],
         corrected_answer: 'I have been jogging every morning for two years.',
+        correction_notes: [{ before: 'jogging', after: 'have been jogging', reason_ko: '기간을 나타내므로 현재완료진행형을 사용합니다.' }],
       }
     : {
         corrected: 'I have been jogging every morning for two years.',

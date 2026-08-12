@@ -13,7 +13,7 @@ process.stdin.on('end', () => {
   console.log(JSON.stringify(evaluation
     ? {
         summary_ko: '재시도로 복구했습니다.', strengths_ko: [], improvements_ko: [],
-        recommended_expressions: [], corrected_answer: 'I went yesterday.',
+        recommended_expressions: [], corrected_answer: 'I went yesterday.', correction_notes: [],
       }
     : {
         corrected: 'I went yesterday.', alternatives: [], explanation_ko: '재시도로 복구했습니다.',

@@ -1,7 +1,7 @@
 import ErrorAlert from './ui/ErrorAlert';
 import StatusBadge from './ui/StatusBadge';
 import { diffWords } from '../lib/diff';
-import type { Attempt, EvalResult } from '../types';
+import type { Attempt, CorrectionNote, EvalResult } from '../types';
 
 const PIPELINE_AUDIO = [
   { key: 'uploaded', label: '업로드' },
@@ -25,6 +25,12 @@ const STATUS_KO: Record<string, string> = {
   verifying: '검증 중',
 };
 
+function isCorrectionNote(value: unknown): value is CorrectionNote {
+  if (!value || typeof value !== 'object') return false;
+  const note = value as Partial<CorrectionNote>;
+  return typeof note.before === 'string' && typeof note.after === 'string' && typeof note.reason_ko === 'string';
+}
+
 function safeParseResult(json: string | null): EvalResult | null {
   if (!json) return null;
   try {
@@ -34,7 +40,9 @@ function safeParseResult(json: string | null): EvalResult | null {
       !Array.isArray(parsed.strengths_ko) ||
       !Array.isArray(parsed.improvements_ko) ||
       !Array.isArray(parsed.recommended_expressions) ||
-      (parsed.corrected_answer !== undefined && typeof parsed.corrected_answer !== 'string')
+      (parsed.corrected_answer !== undefined && typeof parsed.corrected_answer !== 'string') ||
+      (parsed.correction_notes !== undefined &&
+        (!Array.isArray(parsed.correction_notes) || !parsed.correction_notes.every(isCorrectionNote)))
     ) {
       return null;
     }
@@ -136,6 +144,37 @@ export default function AttemptResult({ row }: { row: Attempt }) {
               return <span key={i}>{token.text}</span>;
             })}
           </p>
+          {result.correction_notes !== undefined && (
+            <div className="correction-notes">
+              <h4>수정 이유</h4>
+              {result.correction_notes.length === 0 ? (
+                <p className="row-list__meta">의미 있는 수정 사항이 없습니다.</p>
+              ) : (
+                <ul className="correction-notes__list">
+                  {result.correction_notes.map((note, i) => (
+                    <li key={i} className="correction-note">
+                      <div className="correction-note__change">
+                        <div className="correction-note__part">
+                          <span className="correction-note__label">원문</span>
+                          <span className={`correction-note__value${note.before ? '' : ' correction-note__value--empty'}`}>
+                            {note.before || '없음'}
+                          </span>
+                        </div>
+                        <span className="correction-note__arrow" aria-hidden="true">→</span>
+                        <div className="correction-note__part">
+                          <span className="correction-note__label">교정문</span>
+                          <span className={`correction-note__value${note.after ? '' : ' correction-note__value--empty'}`}>
+                            {note.after || '없음'}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="correction-note__reason">{note.reason_ko}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       )}
       <div>

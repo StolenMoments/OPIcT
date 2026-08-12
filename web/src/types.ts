@@ -15,6 +15,7 @@ export type Correction = {
   created_at: string;
 };
 export type CorrectionResult = { corrected: string; alternatives: { text: string; note_ko: string }[]; explanation_ko: string };
+export type CorrectionNote = { before: string; after: string; reason_ko: string };
 export type Attempt = {
   id: number;
   question_id: number;
@@ -36,6 +37,7 @@ export type EvalResult = {
   improvements_ko: string[];
   recommended_expressions: { text: string; note_ko: string }[];
   corrected_answer?: string;
+  correction_notes?: CorrectionNote[];
 };
 export type PaginatedResponse<T> = {
   items: T[];

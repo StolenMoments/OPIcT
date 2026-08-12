@@ -12,7 +12,7 @@ process.stdin.on('end', () => {
   console.log(JSON.stringify(evaluation
     ? {
         summary_ko: '초안', strengths_ko: [], improvements_ko: [],
-        recommended_expressions: [], corrected_answer: 'I went yesterday.',
+        recommended_expressions: [], corrected_answer: 'I went yesterday.', correction_notes: [],
       }
     : { corrected: 'I went yesterday.', alternatives: [], explanation_ko: '초안' }));
 });

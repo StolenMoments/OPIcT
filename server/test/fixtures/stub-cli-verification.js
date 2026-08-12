@@ -12,6 +12,7 @@ process.stdin.on('end', () => {
         improvements_ko: ['디테일 추가'],
         recommended_expressions: [{ text: 'clear my head', note_ko: '머리를 식히다' }],
         corrected_answer: verifying ? 'I have been jogging every morning for two years.' : 'I am jogging since two years.',
+        correction_notes: [{ before: 'I am jogging', after: 'I have been jogging', reason_ko: '두 해 동안 이어진 동작이므로 현재완료진행형을 사용합니다.' }],
       }
     : {
         corrected: verifying ? 'I have been jogging every morning for two years.' : 'I am jogging since two years.',

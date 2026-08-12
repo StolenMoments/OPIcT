@@ -15,6 +15,7 @@ process.stdin.on('end', () => {
         improvements_ko: [],
         recommended_expressions: [],
         corrected_answer: 'I went yesterday.',
+        correction_notes: [],
       }
     : {
         corrected: 'I went yesterday.',

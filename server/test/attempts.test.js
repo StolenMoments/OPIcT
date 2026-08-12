@@ -51,7 +51,13 @@ test('attempt pipeline: upload → transcribe → evaluate → done', async (t) 
   cleanupUpload(t, row.audio_path);
   assert.equal(row.status, 'done');
   assert.ok(row.transcript.length > 0);
-  assert.ok(JSON.parse(row.result_json));
+  assert.deepEqual(JSON.parse(row.result_json).correction_notes, [
+    {
+      before: 'jogging',
+      after: 'have been jogging',
+      reason_ko: '기간을 나타내므로 현재완료진행형을 사용합니다.',
+    },
+  ]);
 });
 
 test('attempt pipeline saves the second CLI verification result', async (t) => {
@@ -70,6 +76,13 @@ test('attempt pipeline saves the second CLI verification result', async (t) => {
 
     assert.equal(row.status, 'done');
     assert.equal(JSON.parse(row.result_json).corrected_answer, 'I have been jogging every morning for two years.');
+    assert.deepEqual(JSON.parse(row.result_json).correction_notes, [
+      {
+        before: 'I am jogging',
+        after: 'I have been jogging',
+        reason_ko: '두 해 동안 이어진 동작이므로 현재완료진행형을 사용합니다.',
+      },
+    ]);
   } finally {
     process.env.OPICT_CLI_STUB = STUB;
   }
@@ -88,6 +101,7 @@ test('attempt retries an invalid first result once and saves the repaired result
 
     assert.equal(row.status, 'done');
     assert.equal(JSON.parse(row.result_json).corrected_answer, 'I went yesterday.');
+    assert.deepEqual(JSON.parse(row.result_json).correction_notes, []);
     assert.match(row.raw_output, /\[1차 재시도\]/);
   } finally {
     process.env.OPICT_CLI_STUB = STUB;
@@ -107,6 +121,7 @@ test('attempt retries an invalid verification result once and saves the repaired
 
     assert.equal(row.status, 'done');
     assert.equal(JSON.parse(row.result_json).corrected_answer, 'I went yesterday.');
+    assert.deepEqual(JSON.parse(row.result_json).correction_notes, []);
     assert.match(row.raw_output, /\[검증 재시도\]/);
   } finally {
     process.env.OPICT_CLI_STUB = STUB;
