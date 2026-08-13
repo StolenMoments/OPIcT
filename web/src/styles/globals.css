@@ -4,10 +4,42 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@font-face {
+  font-family: "NanumSquare";
+  src: url("../assets/fonts/NanumSquareL.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "NanumSquare";
+  src: url("../assets/fonts/NanumSquareR.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "NanumSquare";
+  src: url("../assets/fonts/NanumSquareB.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "NanumSquare";
+  src: url("../assets/fonts/NanumSquareEB.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+}
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans:
-    system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo",
+    "NanumSquare", system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo",
     "Malgun Gothic", sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);

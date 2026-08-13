@@ -40,10 +40,10 @@ Register: **product / operate**. 연습자가 밤에 혼자 마이크 앞에 앉
 
 ## 타이포그래피와 수치
 
-한글과 영문이 섞이는 작업 화면이므로 시스템 산세리프를 사용한다.
+한글과 영문이 섞이는 작업 화면이므로 drillup과 동일한 로컬 NanumSquare를 기본 글꼴로 사용하고, 로딩 전에는 시스템 산세리프로 대체한다.
 
 ```css
-font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+font-family: "NanumSquare", system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
 ```
 
 - 화면 제목 1.5rem/1.25, 패널 제목 1.125rem/1.35, 본문 0.9375rem/1.65, 메타 0.75rem/1.4.
