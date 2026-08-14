@@ -9,7 +9,31 @@ import {
 
 test('material prompt prioritizes correction reasons, uses expressions second, and preserves source identity', () => {
   const prompt = buildTrainingMaterialPrompt([
-    { source_type: 'attempt', source_id: 7, source_text: 'I go yesterday.', result: { correction_notes: [] } },
+    {
+      source_type: 'attempt',
+      source_id: 7,
+      source_text: 'I go yesterday.',
+      created_at: '2026-08-14 00:00:00',
+      result: {
+        summary_ko: '평가 요약',
+        strengths_ko: ['강점'],
+        improvements_ko: ['개선점'],
+        corrected_answer: 'I went yesterday.',
+        correction_notes: [{ before: 'go', after: 'went', reason_ko: '과거형입니다.' }],
+        recommended_expressions: [{ text: 'go for a walk', note_ko: '산책하다' }],
+      },
+    },
+    {
+      source_type: 'correction',
+      source_id: 8,
+      source_text: 'I am work since Monday.',
+      created_at: '2026-08-14 00:00:01',
+      result: {
+        corrected: 'I have been working since Monday.',
+        alternatives: [{ text: 'I started working on Monday.', note_ko: '시작 시점 강조' }],
+        explanation_ko: '현재완료진행형을 사용합니다.',
+      },
+    },
   ]);
 
   assert.match(prompt, /correction reasons.*first/i);
@@ -17,6 +41,12 @@ test('material prompt prioritizes correction reasons, uses expressions second, a
   assert.match(prompt, /source_type.*source_id/i);
   assert.match(prompt, /Korean intent/i);
   assert.match(prompt, /duplicate/i);
+  assert.match(prompt, /correction_notes/);
+  assert.match(prompt, /recommended_expressions/);
+  assert.match(prompt, /corrected/);
+  assert.match(prompt, /alternatives/);
+  assert.match(prompt, /explanation_ko/);
+  assert.doesNotMatch(prompt, /summary_ko|strengths_ko|improvements_ko|corrected_answer|created_at/);
 });
 
 test('grade prompt accepts natural alternatives but requires meaning, grammar, naturalness, and focus', () => {

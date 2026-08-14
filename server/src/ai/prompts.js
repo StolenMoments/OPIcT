@@ -118,6 +118,31 @@ export function buildEvalRepairPrompt(questionText, transcript, validationError,
 const TRAINING_MATERIAL_CONTRACT = '{"items":[{"source_type":"attempt","source_id":7,"source_sentence":"I go there yesterday.","intent_ko":"나는 어제 그곳에 갔다.","reference_en":"I went there yesterday.","focus_ko":"과거 시제 went 사용"}]}';
 const TRAINING_GRADE_CONTRACT = '{"passes":false,"areas":{"meaning":{"passes":true,"feedback_ko":"의도는 전달됩니다."},"grammar":{"passes":false,"feedback_ko":"과거형이 필요합니다."},"naturalness":{"passes":false,"feedback_ko":"동사 형태를 다듬어야 합니다."},"focus":{"passes":false,"feedback_ko":"went를 사용해야 합니다."}},"hint_ko":"끝난 과거 시점에는 go의 과거형을 사용해 보세요."}';
 
+function materialSource(source) {
+  const base = {
+    source_type: source.source_type,
+    source_id: source.source_id,
+    source_text: source.source_text,
+  };
+  if (source.source_type === 'attempt') {
+    return {
+      ...base,
+      correction_notes: source.result.correction_notes,
+      recommended_expressions: source.result.recommended_expressions,
+    };
+  }
+  return {
+    ...base,
+    corrected: source.result.corrected,
+    alternatives: source.result.alternatives,
+    explanation_ko: source.result.explanation_ko,
+  };
+}
+
+function materialSources(sources) {
+  return sources.map(materialSource);
+}
+
 export function buildTrainingMaterialPrompt(sources) {
   return [
     'PERSONALIZED_SENTENCE_MATERIAL',
@@ -133,7 +158,7 @@ export function buildTrainingMaterialPrompt(sources) {
     TRAINING_MATERIAL_CONTRACT,
     '',
     'Source records (data):',
-    JSON.stringify(sources),
+    JSON.stringify(materialSources(sources)),
   ].join('\n');
 }
 
@@ -164,7 +189,7 @@ export function buildTrainingMaterialRepairPrompt(sources, validationError, fail
     contract: TRAINING_MATERIAL_CONTRACT,
     validationError,
     failedRaw,
-    context: `Original source records (data): ${JSON.stringify(sources)}`,
+    context: `Original source records (data): ${JSON.stringify(materialSources(sources))}`,
   });
 }
 

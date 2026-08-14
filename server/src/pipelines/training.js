@@ -29,6 +29,42 @@ function parseSources(rows) {
   });
 }
 
+function stableSerialize(value) {
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+export function sourceVersion(source) {
+  return createHash('sha256').update(stableSerialize({
+    source_type: source.source_type,
+    source_id: source.source_id,
+    source_text: source.source_text,
+    result: source.result,
+  })).digest('hex');
+}
+
+function snapshotVersion(snapshotJson) {
+  try {
+    const snapshot = JSON.parse(snapshotJson);
+    if (!snapshot || typeof snapshot !== 'object' || !('result' in snapshot)) return null;
+    return sourceVersion(snapshot);
+  } catch {
+    return null;
+  }
+}
+
+function sourceHasMaterial(source, sentences) {
+  const version = sourceVersion(source);
+  return sentences.some((sentence) => (
+    sentence.source_type === source.source_type
+    && sentence.source_id === source.source_id
+    && snapshotVersion(sentence.source_snapshot_json) === version
+  ));
+}
+
 function fingerprint(reference) {
   const normalized = reference.trim().toLocaleLowerCase('en-US').replace(/\s+/g, ' ').replace(/[.!?]+$/g, '');
   return createHash('sha256').update(normalized).digest('hex');
@@ -36,23 +72,65 @@ function fingerprint(reference) {
 
 export async function runTrainingSession(repos, sessionId, now = () => new Date()) {
   const session = repos.training.getSession(sessionId);
-  const sources = parseSources(repos.training.listSources());
-  if (sources.length === 0) {
+  const today = seoulDate(now());
+  let sentences = repos.training.listSentences();
+  let selected = selectSessionItems(sentences, today, 5);
+  let rawOutput = session.raw_output;
+
+  const finishReady = () => {
+    repos.training.addSessionItems(sessionId, selected);
+    repos.training.setSessionStatus(sessionId, {
+      status: 'ready',
+      error_code: null,
+      error_message: null,
+      raw_output: rawOutput,
+    });
+  };
+  const finishEmpty = (errorCode, errorMessage) => {
     repos.training.setSessionStatus(sessionId, {
       status: 'empty',
-      error_code: 'NO_SOURCE_RECORDS',
-      error_message: '완료된 평가 또는 자유 교정 기록이 없습니다.',
+      error_code: errorCode,
+      error_message: errorMessage,
+      raw_output: rawOutput,
     });
+  };
+
+  if (selected.length >= 5) {
+    finishReady();
     return;
   }
 
-  let rawOutput = session.raw_output;
+  const sources = parseSources(repos.training.listSources());
+  if (sources.length === 0) {
+    if (selected.length > 0) {
+      finishReady();
+    } else {
+      finishEmpty(
+        sentences.length === 0 ? 'NO_SOURCE_RECORDS' : 'NO_DUE_SENTENCES',
+        sentences.length === 0
+          ? '완료된 평가 또는 자유 교정 기록이 없습니다.'
+          : '오늘 복습할 문장이나 새 문장이 없습니다.',
+      );
+    }
+    return;
+  }
+
+  const pendingSources = sources.filter((source) => !sourceHasMaterial(source, sentences));
+  if (pendingSources.length === 0) {
+    if (selected.length > 0) {
+      finishReady();
+    } else {
+      finishEmpty('NO_DUE_SENTENCES', '오늘 복습할 문장이나 새 문장이 없습니다.');
+    }
+    return;
+  }
+
   try {
     const generated = await runValidatedStage({
       cli: session.cli,
       model: session.model,
-      prompt: buildTrainingMaterialPrompt(sources),
-      repairPrompt: (error, failedRaw) => buildTrainingMaterialRepairPrompt(sources, error, failedRaw),
+      prompt: buildTrainingMaterialPrompt(pendingSources),
+      repairPrompt: (error, failedRaw) => buildTrainingMaterialRepairPrompt(pendingSources, error, failedRaw),
       outputSchema: trainingMaterialSchema,
       phase: '훈련 문장 생성',
     });
@@ -67,7 +145,7 @@ export async function runTrainingSession(repos, sessionId, now = () => new Date(
       return;
     }
 
-    const sourceMap = new Map(sources.map((source) => [`${source.source_type}:${source.source_id}`, source]));
+    const sourceMap = new Map(pendingSources.map((source) => [`${source.source_type}:${source.source_id}`, source]));
     for (const candidate of generated.value.items) {
       const source = sourceMap.get(`${candidate.source_type}:${candidate.source_id}`);
       if (!source) continue;
@@ -78,23 +156,13 @@ export async function runTrainingSession(repos, sessionId, now = () => new Date(
       });
     }
 
-    const selected = selectSessionItems(repos.training.listSentences(), seoulDate(now()), 5);
+    sentences = repos.training.listSentences();
+    selected = selectSessionItems(sentences, today, 5);
     if (selected.length === 0) {
-      repos.training.setSessionStatus(sessionId, {
-        status: 'empty',
-        error_code: 'NO_DUE_SENTENCES',
-        error_message: '오늘 복습할 문장이나 새 문장이 없습니다.',
-        raw_output: rawOutput,
-      });
+      finishEmpty('NO_DUE_SENTENCES', '오늘 복습할 문장이나 새 문장이 없습니다.');
       return;
     }
-    repos.training.addSessionItems(sessionId, selected);
-    repos.training.setSessionStatus(sessionId, {
-      status: 'ready',
-      error_code: null,
-      error_message: null,
-      raw_output: rawOutput,
-    });
+    finishReady();
   } catch (error) {
     repos.training.setSessionStatus(sessionId, {
       status: 'error',

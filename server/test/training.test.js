@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { buildApp } from '../src/app.js';
 import { hashPassword } from '../src/auth/password.js';
+import { sourceVersion } from '../src/pipelines/training.js';
 
 const TRAINING_STUB = fileURLToPath(new URL('./fixtures/stub-cli-training.js', import.meta.url));
 const FAIL_STUB = fileURLToPath(new URL('./fixtures/stub-cli-fail.js', import.meta.url));
+const SOURCE_VERSION_STUB = fileURLToPath(new URL('./fixtures/stub-cli-training-source-version.js', import.meta.url));
 process.env.OPICT_CLI_STUB = TRAINING_STUB;
 
 async function waitFor(app, url, statuses, timeoutMs = 5000) {
@@ -73,6 +75,186 @@ async function createReadySession(app) {
   assert.equal(created.statusCode, 202);
   return waitFor(app, `/api/training/sessions/${created.json().id}`, ['ready', 'empty', 'error']);
 }
+
+function seedCachedSentences(app, count) {
+  for (let index = 0; index < count; index += 1) {
+    app.repos.training.insertSentence({
+      source_type: 'correction',
+      source_id: 900 + index,
+      source_snapshot_json: JSON.stringify({
+        source_type: 'correction',
+        source_id: 900 + index,
+        source_text: `Cached source ${index}`,
+        created_at: '2026-08-13 00:00:00',
+        result: {
+          corrected: `Cached sentence ${index}.`,
+          alternatives: [],
+          explanation_ko: '캐시 문장',
+        },
+      }),
+      source_sentence: `Cached source ${index}`,
+      intent_ko: `캐시 문장 ${index}`,
+      reference_en: `Cached sentence ${index}.`,
+      focus_ko: '캐시 확인',
+      fingerprint: `cached-${index}`,
+    });
+  }
+}
+
+function seedVersionedCorrection(app, { inputText, result }) {
+  const correction = app.repos.corrections.create({
+    input_text: inputText,
+    cli: 'claude',
+    model: 'claude-sonnet-5',
+  });
+  app.repos.corrections.setStatus(correction.id, {
+    status: 'done',
+    result_json: JSON.stringify(result),
+  });
+  return correction;
+}
+
+function cacheSourceVersion(app, source, result, fingerprint) {
+  const sourceRow = app.repos.training.listSources()
+    .find(({ source_type, id }) => source_type === 'correction' && id === source.id);
+  app.repos.training.insertSentence({
+    source_type: 'correction',
+    source_id: source.id,
+    source_snapshot_json: JSON.stringify({
+      source_type: 'correction',
+      source_id: source.id,
+      source_text: sourceRow.source_text,
+      created_at: sourceRow.created_at,
+      result,
+    }),
+    source_sentence: sourceRow.source_text,
+    intent_ko: '기존 문장',
+    reference_en: `Cached sentence ${source.id}.`,
+    focus_ko: '기존 결과 보존',
+    fingerprint,
+  });
+}
+
+test('source version is stable across object key order and changes when parsed result changes', () => {
+  const first = sourceVersion({
+    source_type: 'attempt',
+    source_id: 7,
+    source_text: 'I go yesterday.',
+    result: { correction_notes: [], recommended_expressions: [] },
+  });
+  const reordered = sourceVersion({
+    result: { recommended_expressions: [], correction_notes: [] },
+    source_text: 'I go yesterday.',
+    source_id: 7,
+    source_type: 'attempt',
+  });
+  const changed = sourceVersion({
+    source_type: 'attempt',
+    source_id: 7,
+    source_text: 'I go yesterday.',
+    result: { correction_notes: [{ before: 'go', after: 'went', reason_ko: '과거형' }], recommended_expressions: [] },
+  });
+
+  assert.equal(first, reordered);
+  assert.notEqual(first, changed);
+});
+
+test('a second session reuses five cached sentences without reading sources or invoking material CLI', async (t) => {
+  const app = await prepareApp(t);
+  const firstSession = await createReadySession(app);
+  app.repos.training.setSessionStatus(firstSession.id, { status: 'completed' });
+  seedCachedSentences(app, 5);
+
+  let sourceReads = 0;
+  const trainingRepo = app.repos.training;
+  app.repos.training = new Proxy(trainingRepo, {
+    get(target, property, receiver) {
+      if (property === 'listSources') {
+        return (...args) => {
+          sourceReads += 1;
+          return target.listSources(...args);
+        };
+      }
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  const secondSession = await createReadySession(app);
+  assert.equal(secondSession.status, 'ready');
+  assert.equal(secondSession.items.length, 5);
+  assert.equal(sourceReads, 0);
+  assert.equal(app.repos.training.getSession(secondSession.id).raw_output, null);
+});
+
+test('changed source results regenerate only that source and preserve the prior snapshot', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  await app.inject({
+    method: 'PUT',
+    url: '/api/settings',
+    payload: { default_cli: 'claude', default_model_claude: 'claude-sonnet-5' },
+  });
+  const stable = seedVersionedCorrection(app, {
+    inputText: 'Stable source.',
+    result: { corrected: 'Stable source.', alternatives: [], explanation_ko: '변경 없음' },
+  });
+  const changed = seedVersionedCorrection(app, {
+    inputText: 'Changed source.',
+    result: { corrected: 'Changed source.', alternatives: [], explanation_ko: '변경됨' },
+  });
+  const previousResult = { corrected: 'Changed source.', alternatives: [], explanation_ko: '이전 결과' };
+  cacheSourceVersion(app, stable, { corrected: 'Stable source.', alternatives: [], explanation_ko: '변경 없음' }, 'stable-cache');
+  cacheSourceVersion(app, changed, previousResult, 'changed-cache');
+
+  process.env.OPICT_CLI_STUB = SOURCE_VERSION_STUB;
+  try {
+    const session = await createReadySession(app);
+    assert.equal(session.status, 'ready');
+    const sentences = app.repos.training.listSentences();
+    assert.equal(sentences.filter((sentence) => sentence.source_id === stable.id).length, 1);
+    assert.equal(sentences.filter((sentence) => sentence.source_id === changed.id).length, 2);
+    assert.equal(
+      sentences.find((sentence) => sentence.source_id === changed.id && sentence.fingerprint === 'changed-cache').source_snapshot_json,
+      JSON.stringify({
+        source_type: 'correction',
+        source_id: changed.id,
+        source_text: 'Changed source.',
+        created_at: app.repos.training.listSources().find((source) => source.id === changed.id).created_at,
+        result: previousResult,
+      }),
+    );
+  } finally {
+    process.env.OPICT_CLI_STUB = TRAINING_STUB;
+  }
+});
+
+test('cache and newly generated material are combined with a five-item limit', async (t) => {
+  const app = await prepareApp(t);
+  seedCachedSentences(app, 4);
+
+  const session = await createReadySession(app);
+  assert.equal(session.status, 'ready');
+  assert.equal(session.items.length, 5);
+  assert.deepEqual(
+    session.items.slice(0, 4).map((item) => item.source_id),
+    [900, 901, 902, 903],
+  );
+});
+
+test('no source records and no cached sentences preserve the empty state contract', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  await app.inject({
+    method: 'PUT',
+    url: '/api/settings',
+    payload: { default_cli: 'claude', default_model_claude: 'claude-sonnet-5' },
+  });
+
+  const session = await createReadySession(app);
+  assert.equal(session.status, 'empty');
+  assert.equal(session.error_code, 'NO_SOURCE_RECORDS');
+  assert.deepEqual(session.items, []);
+});
 
 test('session material includes evaluation and correction sources, removes duplicates, and hides references', async (t) => {
   const app = await prepareApp(t);
