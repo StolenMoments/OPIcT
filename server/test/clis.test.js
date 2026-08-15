@@ -35,11 +35,11 @@ test('셸은 .cmd 래퍼로 떨어졌을 때만 켠다', () => {
 
 test('agy는 프롬프트를 -p 인자로 원문 그대로 받고 stdin으로는 보내지 않는다', () => {
   const prompt = 'line one\nsays "quoted" & more';
-  const inv = buildInvocation({ cli: 'agy', model: 'gemini-3.6-flash', prompt });
+  const inv = buildInvocation({ cli: 'agy', model: 'gemini-3.7-flash', prompt });
   assert.equal(inv.stdinPrompt, null);
   // 따옴표·개행이 든 프롬프트가 하나의 인자로 온전히 들어가야 한다.
   assert.equal(inv.args[inv.args.indexOf('-p') + 1], prompt);
-  assert.equal(inv.args[inv.args.indexOf('--model') + 1], 'gemini-3.6-flash');
+  assert.equal(inv.args[inv.args.indexOf('--model') + 1], 'gemini-3.7-flash');
   // 셸을 거치면 인자 경계가 깨지므로 agy는 .exe로 해석돼 셸 없이 실행돼야 한다.
   assert.ok(!inv.opts.shell, JSON.stringify(inv.opts));
 });
@@ -54,7 +54,7 @@ test('stdin 방식 CLI는 프롬프트를 원문 그대로 stdin으로 보낸다
 });
 
 test('스텁이 설정되면 어떤 CLI든 stdin 방식으로 실행된다', () => {
-  const inv = buildInvocation({ cli: 'agy', model: 'gemini-3.6-flash', prompt: 'p', stub: '/tmp/stub.js' });
+  const inv = buildInvocation({ cli: 'agy', model: 'gemini-3.7-flash', prompt: 'p', stub: '/tmp/stub.js' });
   assert.equal(inv.cmd, process.execPath);
   assert.deepEqual(inv.args, ['/tmp/stub.js']);
   assert.equal(inv.stdinPrompt, 'p');

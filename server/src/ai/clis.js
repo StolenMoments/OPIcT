@@ -65,7 +65,7 @@ export const CLIS = {
   },
   agy: {
     label: 'Antigravity CLI',
-    models: ['gemini-3.6-flash'],
+    models: ['gemini-3.7-flash'],
     promptMode: 'argv',
     bin: () => win
       ? [join(localAppData(), 'agy', 'bin', 'agy.exe'),
