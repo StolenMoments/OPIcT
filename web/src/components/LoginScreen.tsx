@@ -31,8 +31,7 @@ export default function LoginScreen({ onLogin }: { onLogin: (password: string) =
           <span className="auth-screen__brand">
             <Radio aria-hidden="true" /> OPIcT
           </span>
-          <h1>방송 부스에 입장하세요</h1>
-          <p>개인 연습 신호를 이어가려면 비밀번호를 입력하세요.</p>
+          <h1>비밀번호 입력하세요.</h1>
         </div>
         <Field data-invalid={Boolean(error)}>
           <FieldLabel htmlFor="opict-password">비밀번호</FieldLabel>
