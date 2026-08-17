@@ -10,8 +10,8 @@ type ThemeContextValue = {
 };
 
 const STORAGE_KEY = 'opict-theme';
-const DARK_THEME_COLOR = '#221d19';
-const LIGHT_THEME_COLOR = '#f8f7f5';
+const DARK_THEME_COLOR = '#111A2E';
+const LIGHT_THEME_COLOR = '#F7F9FF';
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function readTheme(): Theme {

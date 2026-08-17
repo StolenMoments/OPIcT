@@ -93,6 +93,39 @@ describe("App authentication gate", () => {
     Reflect.deleteProperty(window, "opictAndroid");
   });
 
+  it("keeps the browser theme color aligned with the resolved theme", async () => {
+    const themeColor = document.createElement("meta");
+    themeColor.name = "theme-color";
+    themeColor.content = "#000000";
+    document.head.append(themeColor);
+
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === "/auth/session") return { authenticated: true };
+      if (path === "/health") return { ok: true };
+      if (path === "/settings") return {};
+      if (path === "/categories") return [];
+      if (path.startsWith("/attempts?") || path.startsWith("/corrections?")) {
+        return { items: [], total: 0, limit: 10, offset: 0 };
+      }
+      return [];
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(themeColor).toHaveAttribute("content", "#111A2E");
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "설정" }));
+    fireEvent.change(await screen.findByLabelText("테마"), {
+      target: { value: "light" },
+    });
+
+    await waitFor(() => {
+      expect(themeColor).toHaveAttribute("content", "#F7F9FF");
+    });
+  });
+
   it("preserves an unfinished correction when moving between menus", async () => {
     vi.mocked(api).mockImplementation(async (path) => {
       if (path === "/auth/session") return { authenticated: true };

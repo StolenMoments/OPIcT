@@ -7,9 +7,9 @@ Register: **product / operate**. 연습자가 밤에 혼자 마이크 앞에 앉
 30대 직장인이 밤 10시 어두운 거실에서 휴대폰을 세워 두고 답변을 녹음한다. 팔 길이에서도 문항과 녹음 상태가 읽혀야 하고, 업로드·전사·평가 신호가 한눈에 구분되어야 한다.
 
 - 다크가 기본이며 라이트와 시스템 테마도 동등하게 동작한다.
-- 흑연색 표면과 앰버 탤리 한 색으로 신호를 만든다.
+- 딥 네이비 표면과 시안 탤리 한 색으로 신호를 만든다.
 - 패널은 방송 콘솔처럼 선명한 구획과 상태 레일을 갖되 카드 중첩은 피한다.
-- 기존 PWA 아이콘과 정적 브랜드 색 `#221d19`, `#e2883f`, `#fff8e7`을 유지한다.
+- 기존 PWA 아이콘의 도형은 유지하고 정적 브랜드 색 `#111A2E`, `#42B8F4`, `#EFF7FF`로 재색상한다.
 
 ## 기술 기반
 
@@ -21,20 +21,20 @@ Register: **product / operate**. 연습자가 밤에 혼자 마이크 앞에 앉
 
 ## 색과 테마
 
-색 전략은 **Restrained**다. 중립 표면에 앰버를 primary action, 현재 탭, 녹음·진행 신호에만 사용한다. 성공과 위험은 계약상 필요한 상태에만 제한한다.
+색 전략은 **Restrained**다. 딥 네이비 표면에 시안을 primary action, 현재 탭, 녹음·진행 신호에만 사용한다. 성공은 녹색, 오류와 삭제는 빨간색으로 유지해 상태 의미를 보존한다.
 
 | 역할 | 다크 | 라이트 |
 |---|---|---|
-| background | `oklch(0.15 0.008 55)` | `oklch(0.98 0.004 70)` |
-| card/popover | `oklch(0.19 0.009 55)` | `oklch(1 0 0)` |
-| secondary/muted | `oklch(0.23 0.010 55)` | `oklch(0.94 0.006 70)` |
-| border/input | `oklch(0.31 0.012 55)` | `oklch(0.86 0.008 70)` |
-| foreground | `oklch(0.96 0.006 70)` | `oklch(0.20 0.010 55)` |
-| muted foreground | `oklch(0.72 0.010 60)` | `oklch(0.45 0.012 55)` |
-| primary | `oklch(0.74 0.155 55)` | `oklch(0.58 0.155 50)` |
-| destructive | `oklch(0.67 0.18 25)` | `oklch(0.56 0.20 25)` |
-| success | `oklch(0.73 0.13 155)` | `oklch(0.48 0.12 155)` |
-| ring | `oklch(0.78 0.12 70)` | `oklch(0.55 0.14 50)` |
+| background | `#111A2E` | `#F7F9FF` |
+| card/popover | `#182541` | `#FFFFFF` |
+| secondary/muted | `#223556` | `#E6EEF8` |
+| border/input | `#55749A` | `#7190AD` |
+| foreground | `#EFF7FF` | `#14213D` |
+| muted foreground | `#A9BED4` | `#4C627C` |
+| primary | `#42B8F4` | `#0B6F9E` |
+| destructive | `#FF8A82` | `#BE3E48` |
+| success | `#6FD39A` | `#287A4E` |
+| ring | `#8EDBFF` | `#0B6F9E` |
 
 `.dark`가 명시적 다크, `.light`가 명시적 라이트를 소유한다. `system`은 OS 선호를 따라 실제 클래스와 `color-scheme`, 브라우저 `theme-color`, Android 시스템 바를 동기화한다.
 
@@ -62,7 +62,7 @@ font-family: "NanumSquare", system-ui, -apple-system, "Segoe UI", "Apple SD Goth
 ## 셸과 반응형
 
 - 모든 화면은 상단 상태 헤더와 하단 고정 5메뉴를 공유한다.
-- 하단 메뉴는 아이콘과 라벨을 함께 쓰며 현재 메뉴는 앰버 라벨과 상단 tally line으로 표시한다. 각 항목은 최소 44px다.
+- 하단 메뉴는 아이콘과 라벨을 함께 쓰며 현재 메뉴는 시안 라벨과 상단 tally line으로 표시한다. 각 항목은 최소 44px다.
 - 본문은 safe-area를 포함해 헤더와 하단 메뉴에 가리지 않는다.
 - 모바일은 단일 열이다. 900px 이상에서는 본문 최대 폭을 넓혀 연습 신호 레일, 교정 입력·결과, 설정 그룹을 2단으로 배치한다.
 - PC에서도 하단 메뉴 위치를 바꾸지 않는다. 넓은 공간은 본문의 비교와 읽기에만 사용한다.
@@ -101,5 +101,5 @@ font-family: "NanumSquare", system-ui, -apple-system, "Segoe UI", "Apple SD Goth
 - 글래스모피즘, 그라디언트 텍스트, 장식용 그리드 배경, 컬러 사이드 스트라이프.
 - 섹션마다 반복되는 대문자 eyebrow와 의미 없는 번호.
 - 카드 속 카드, 모든 내용을 pill에 넣기, 과도한 둥근 모서리.
-- 장식용 앰버 사용, 바운스 모션, 중앙 전체 화면 spinner.
+- 장식용 시안 사용, 바운스 모션, 중앙 전체 화면 spinner.
 - shadcn 컴포넌트의 내부 API를 앱 도메인에 맞춰 과도하게 변형하기.
