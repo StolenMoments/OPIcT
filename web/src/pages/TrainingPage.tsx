@@ -77,7 +77,7 @@ function FeedbackPanel({ item, answer }: { item: TrainingItem; answer: TrainingA
               <Lightbulb aria-hidden="true" />
               <div>
                 <strong>한국어 힌트</strong>
-                <p>{verdict.hint_ko}</p>
+                <p className="whitespace-pre-line">{verdict.hint_ko}</p>
               </div>
             </div>
           )}

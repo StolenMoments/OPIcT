@@ -63,6 +63,10 @@ test('grade prompt accepts natural alternatives but requires meaning, grammar, n
     assert.match(prompt, new RegExp(area, 'i'));
   }
   assert.match(prompt, /hint_ko/i);
+  assert.match(prompt, /구조: /);
+  assert.match(prompt, /핵심 표현: /);
+  assert.match(prompt, /at most 3 words/i);
+  assert.match(prompt, /never quote more than 3 consecutive words/i);
 });
 
 test('training schemas reject incomplete material and grading results', () => {
