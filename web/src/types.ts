@@ -97,6 +97,16 @@ export type TrainingItem = {
   answers: TrainingAnswer[];
 };
 
+export type DrillResult = 'exact' | 'self_pass' | 'wrong';
+
+export type DrillItem = {
+  id: number;
+  intent_ko: string;
+  focus_ko: string;
+  reference_en: string;
+  mastery_status: 'learning' | 'mastered';
+};
+
 export type TrainingSession = {
   id: number;
   status: 'building' | 'ready' | 'in_progress' | 'completed' | 'empty' | 'error';

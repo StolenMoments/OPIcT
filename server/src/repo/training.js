@@ -216,5 +216,41 @@ export function trainingRepo(db) {
         ).all(sessionId).map(({ outcome, count }) => [outcome, count]),
       );
     },
+    listDrillSentences(limit = 10) {
+      // Recency is ordered by training_drill_results.id (strictly monotonic on
+      // insert) rather than created_at, since datetime('now') only has
+      // second resolution and ties within the same second would otherwise
+      // fall back to sentence id instead of true insertion order.
+      return db.prepare(
+        `SELECT s.*,
+           (SELECT MAX(id) FROM training_drill_results d WHERE d.sentence_id=s.id AND d.result='wrong') AS last_wrong_id,
+           (SELECT MAX(id) FROM training_drill_results d WHERE d.sentence_id=s.id) AS last_drilled_id
+         FROM training_sentences s
+         WHERE EXISTS (
+           SELECT 1 FROM training_session_items i WHERE i.sentence_id=s.id AND i.status='completed'
+         )
+         ORDER BY
+           CASE WHEN last_wrong_id IS NOT NULL THEN 0 ELSE 1 END,
+           last_wrong_id DESC,
+           CASE WHEN last_drilled_id IS NULL THEN 0 ELSE 1 END,
+           last_drilled_id ASC,
+           s.id ASC
+         LIMIT ?`,
+      ).all(limit);
+    },
+    countDrillEligible() {
+      return db.prepare(
+        `SELECT COUNT(*) AS count FROM training_sentences s
+         WHERE EXISTS (
+           SELECT 1 FROM training_session_items i WHERE i.sentence_id=s.id AND i.status='completed'
+         )`,
+      ).get().count;
+    },
+    recordDrillResult({ sentence_id, result, answer_text }) {
+      const info = db.prepare(
+        `INSERT INTO training_drill_results (sentence_id,result,answer_text) VALUES (?,?,?)`,
+      ).run(sentence_id, result, answer_text);
+      return db.prepare('SELECT * FROM training_drill_results WHERE id=?').get(info.lastInsertRowid);
+    },
   };
 }

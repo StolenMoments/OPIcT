@@ -13,6 +13,7 @@ import ActionEmpty from "@/components/ui/ActionEmpty";
 import ListSkeleton from "@/components/ui/ListSkeleton";
 import type { Correction, CorrectionResult } from "../types";
 import TrainingPage from "./TrainingPage";
+import SpeedDrillPage from "./SpeedDrillPage";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function safeParseResult(json: string | null): CorrectionResult | null {
@@ -262,20 +263,24 @@ export default function CorrectPage({
   visible?: boolean;
   onOpenSettings?: () => void;
 }) {
-  const [mode, setMode] = useState<'training' | 'correction'>('training');
+  const [mode, setMode] = useState<'training' | 'drill' | 'correction'>('training');
   return (
     <div className="page sentence-page">
       <div className="page-heading">
         <h2>문장</h2>
         <p>기록에서 만든 오늘의 문장을 훈련하거나, 원하는 문장을 바로 교정합니다.</p>
       </div>
-      <Tabs value={mode} onValueChange={(value) => setMode(value as 'training' | 'correction')}>
+      <Tabs value={mode} onValueChange={(value) => setMode(value as 'training' | 'drill' | 'correction')}>
         <TabsList variant="line" aria-label="문장 학습 방식">
           <TabsTrigger value="training">훈련</TabsTrigger>
+          <TabsTrigger value="drill">순간영작</TabsTrigger>
           <TabsTrigger value="correction">자유 교정</TabsTrigger>
         </TabsList>
         <TabsContent value="training" keepMounted>
           <TrainingPage visible={visible && mode === 'training'} onOpenCorrection={() => setMode('correction')} onOpenSettings={onOpenSettings} />
+        </TabsContent>
+        <TabsContent value="drill" keepMounted>
+          <SpeedDrillPage visible={visible && mode === 'drill'} />
         </TabsContent>
         <TabsContent value="correction" keepMounted>
           <FreeCorrection visible={visible && mode === 'correction'} />

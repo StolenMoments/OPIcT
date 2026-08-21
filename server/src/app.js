@@ -16,6 +16,7 @@ import { retryRoutes } from './routes/retry.js';
 import { authRoutes } from './routes/auth.js';
 import { registerAuthHook, resolveAuthConfig } from './auth/auth-plugin.js';
 import { trainingRoutes } from './routes/training.js';
+import { drillRoutes } from './routes/drill.js';
 
 export async function buildApp({ dbFile = 'data/opict.db', logger = false, auth, now = () => new Date() } = {}) {
   const authConfig = auth === undefined
@@ -37,6 +38,7 @@ export async function buildApp({ dbFile = 'data/opict.db', logger = false, auth,
   await app.register(attemptsRoutes);
   await app.register(retryRoutes);
   await app.register(trainingRoutes);
+  await app.register(drillRoutes);
   app.addHook('onClose', async () => app.repos.close());
 
   const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));

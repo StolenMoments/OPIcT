@@ -109,3 +109,12 @@ CREATE TABLE IF NOT EXISTS training_answers (
 CREATE INDEX IF NOT EXISTS idx_training_review ON training_sentences(session_count, next_review_on);
 CREATE INDEX IF NOT EXISTS idx_training_items_session ON training_session_items(session_id, position);
 CREATE INDEX IF NOT EXISTS idx_training_answers_item ON training_answers(session_item_id, attempt_no);
+
+CREATE TABLE IF NOT EXISTS training_drill_results (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sentence_id INTEGER NOT NULL REFERENCES training_sentences(id) ON DELETE CASCADE,
+  result TEXT NOT NULL CHECK (result IN ('exact','self_pass','wrong')),
+  answer_text TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_drill_results_sentence ON training_drill_results(sentence_id, created_at);
