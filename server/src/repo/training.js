@@ -94,8 +94,8 @@ export function trainingRepo(db) {
     insertSentence(sentence) {
       db.prepare(
         `INSERT INTO training_sentences
-         (source_type,source_id,source_snapshot_json,source_sentence,intent_ko,reference_en,focus_ko,fingerprint)
-         VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(fingerprint) DO NOTHING`,
+         (source_type,source_id,source_snapshot_json,source_sentence,intent_ko,reference_en,focus_ko,fingerprint,parent_id,variation_kind)
+         VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(fingerprint) DO NOTHING`,
       ).run(
         sentence.source_type,
         sentence.source_id,
@@ -105,7 +105,18 @@ export function trainingRepo(db) {
         sentence.reference_en,
         sentence.focus_ko,
         sentence.fingerprint,
+        sentence.parent_id ?? null,
+        sentence.variation_kind ?? null,
       );
+    },
+    listMasteredWithoutVariation(limit = 2) {
+      return db.prepare(
+        `SELECT * FROM training_sentences s
+         WHERE s.mastery_status='mastered' AND s.parent_id IS NULL
+           AND NOT EXISTS (SELECT 1 FROM training_sentences v WHERE v.parent_id=s.id)
+         ORDER BY s.updated_at ASC, s.id ASC
+         LIMIT ?`,
+      ).all(limit);
     },
     listSentences() {
       return db.prepare('SELECT * FROM training_sentences ORDER BY id').all();
@@ -119,7 +130,7 @@ export function trainingRepo(db) {
     listSessionItems(sessionId) {
       return db.prepare(
         `SELECT i.*, s.source_type, s.source_id, s.source_sentence, s.intent_ko, s.reference_en,
-         s.focus_ko, s.mastery_status
+         s.focus_ko, s.mastery_status, s.parent_id, s.variation_kind
          FROM training_session_items i JOIN training_sentences s ON s.id=i.sentence_id
          WHERE i.session_id=? ORDER BY i.position`,
       ).all(sessionId);

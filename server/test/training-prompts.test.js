@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseAndValidateJson } from '../src/ai/parse.js';
-import { trainingGradeSchema, trainingMaterialSchema } from '../src/ai/schemas.js';
+import { trainingGradeSchema, trainingMaterialSchema, trainingVariationSchema } from '../src/ai/schemas.js';
 import {
   buildTrainingGradePrompt,
   buildTrainingMaterialPrompt,
+  buildTrainingVariationPrompt,
 } from '../src/ai/prompts.js';
 
 test('material prompt prioritizes correction reasons, uses expressions second, and preserves source identity', () => {
@@ -87,10 +88,25 @@ test('grade prompt accepts natural alternatives but requires meaning, grammar, n
   assert.match(prompt, /never quote more than 3 consecutive words/i);
 });
 
-test('training schemas reject incomplete material and grading results', () => {
+test('variation prompt asks for tense/subject/negation/question variants and preserves parent identity', () => {
+  const prompt = buildTrainingVariationPrompt([
+    { id: 12, reference_en: 'I went to the park yesterday.', intent_ko: '나는 어제 공원에 갔다.', focus_ko: '과거 시제 went 사용' },
+  ]);
+
+  assert.match(prompt, /"parent_id":12/);
+  for (const kind of ['tense', 'subject', 'negation', 'question']) {
+    assert.match(prompt, new RegExp(kind, 'i'));
+  }
+  assert.match(prompt, /parent_id/);
+  assert.match(prompt, /variation_kind/);
+});
+
+test('training schemas reject incomplete material, grading, and variation results', () => {
   const badMaterial = parseAndValidateJson(JSON.stringify({ items: [{ source_type: 'attempt' }] }), trainingMaterialSchema);
   const badGrade = parseAndValidateJson(JSON.stringify({ passes: true, areas: {} }), trainingGradeSchema);
+  const badVariation = parseAndValidateJson(JSON.stringify({ items: [{ parent_id: 1, variation_kind: 'plural' }] }), trainingVariationSchema);
 
   assert.equal(badMaterial.ok, false);
   assert.equal(badGrade.ok, false);
+  assert.equal(badVariation.ok, false);
 });

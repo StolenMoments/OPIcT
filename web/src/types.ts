@@ -87,12 +87,14 @@ export type TrainingItem = {
     | 'revision_error'
     | 'completed';
   outcome: 'first_try_pass' | 'hint_pass' | 'review' | null;
-  source_type: 'attempt' | 'correction';
+  source_type: 'attempt' | 'correction' | 'note';
   source_id: number;
   source_sentence: string;
   intent_ko: string;
   focus_ko: string;
   mastery_status: 'learning' | 'mastered';
+  is_variation: boolean;
+  variation_kind: 'tense' | 'subject' | 'negation' | 'question' | null;
   reference_en?: string;
   answers: TrainingAnswer[];
 };

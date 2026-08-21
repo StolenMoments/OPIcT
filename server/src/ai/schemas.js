@@ -122,11 +122,36 @@ export const trainingGradeSchema = {
   additionalProperties: false,
 };
 
+export const trainingVariationSchema = {
+  type: 'object',
+  properties: {
+    items: {
+      type: 'array',
+      maxItems: 6,
+      items: {
+        type: 'object',
+        properties: {
+          parent_id: { type: 'integer', minimum: 1 },
+          variation_kind: { type: 'string', enum: ['tense', 'subject', 'negation', 'question'] },
+          intent_ko: { type: 'string', minLength: 1 },
+          reference_en: { type: 'string', minLength: 1 },
+          focus_ko: { type: 'string', minLength: 1 },
+        },
+        required: ['parent_id', 'variation_kind', 'intent_ko', 'reference_en', 'focus_ko'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['items'],
+  additionalProperties: false,
+};
+
 export const outputSchemas = {
   correction: correctionResultSchema,
   evaluation: evaluationResultSchema,
   trainingMaterial: trainingMaterialSchema,
   trainingGrade: trainingGradeSchema,
+  trainingVariation: trainingVariationSchema,
 };
 
 // Short aliases keep the schema names convenient for callers that only need one result type.

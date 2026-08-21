@@ -46,6 +46,8 @@ function serializeSession(repos, session) {
       intent_ko: item.intent_ko,
       focus_ko: item.focus_ko,
       mastery_status: item.mastery_status,
+      is_variation: item.parent_id != null,
+      variation_kind: item.variation_kind,
       answers: repos.training.listItemAnswers(item.id).map((answer) => serializeAnswer({
         ...answer,
         item_status: item.status,

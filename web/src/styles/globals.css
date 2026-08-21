@@ -828,8 +828,16 @@
   color: var(--muted-foreground);
   font-size: 0.75rem;
 }
-.training-prompt__meta span:last-child {
+.training-prompt__meta span:nth-child(2) {
   color: var(--primary);
+}
+.training-badge {
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: var(--accent);
+  color: var(--accent-foreground);
 }
 .training-intent,
 .training-focus {

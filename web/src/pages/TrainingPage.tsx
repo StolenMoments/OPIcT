@@ -24,6 +24,12 @@ import type {
 
 type StartRecovery = 'settings' | 'generic' | null;
 
+const SOURCE_LABELS: Record<TrainingItem['source_type'], string> = {
+  attempt: '평가 기록',
+  correction: '자유 교정 기록',
+  note: '저장한 노트',
+};
+
 const AREA_LABELS: Array<[keyof TrainingVerdict['areas'], string]> = [
   ['meaning', '의미'],
   ['grammar', '문법'],
@@ -360,8 +366,9 @@ export default function TrainingPage({
       <div className="training-layout">
         <section className="section training-prompt">
           <div className="training-prompt__meta">
-            <span>{currentItem.source_type === 'attempt' ? '평가 기록' : '자유 교정 기록'}</span>
+            <span>{SOURCE_LABELS[currentItem.source_type]}</span>
             <span>{currentItem.mastery_status === 'mastered' ? '익힘 복습' : '학습 중'}</span>
+            {currentItem.is_variation && <span className="training-badge training-badge--variation">패턴 변형</span>}
           </div>
           <div className="training-intent">
             <span>한국어 의도</span>

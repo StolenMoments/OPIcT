@@ -22,6 +22,8 @@ const firstItem = {
   intent_ko: '나는 어제 공원에 갔다.',
   focus_ko: '과거 시점을 나타내는 went 사용',
   mastery_status: 'learning' as const,
+  is_variation: false,
+  variation_kind: null,
   answers: [],
 };
 
@@ -210,6 +212,21 @@ describe('TrainingPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '오늘의 문장 시작' }));
     fireEvent.click(await screen.findByRole('button', { name: '자유 교정 열기' }));
     expect(openCorrection).toHaveBeenCalledOnce();
+  });
+
+  it('shows a pattern-variation badge only for variation items', async () => {
+    const variationSession = session([
+      { ...firstItem, is_variation: true, variation_kind: 'tense' as const },
+    ], 'ready');
+    vi.mocked(api).mockImplementation(async (path, init) => {
+      if (path === '/training/sessions' && init?.method === 'POST') return { id: 1 };
+      if (path === '/training/sessions/1') return variationSession;
+      return null;
+    });
+
+    render(<TrainingPage onOpenCorrection={vi.fn()} onOpenSettings={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '오늘의 문장 시작' }));
+    expect(await screen.findByText('패턴 변형')).toBeInTheDocument();
   });
 
   it('preserves a failed answer and retries its grading', async () => {

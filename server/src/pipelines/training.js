@@ -1,13 +1,60 @@
 import { createHash } from 'node:crypto';
 import { runValidatedStage, combineRawOutputs } from '../ai/validated.js';
-import { trainingGradeSchema, trainingMaterialSchema } from '../ai/schemas.js';
+import { trainingGradeSchema, trainingMaterialSchema, trainingVariationSchema } from '../ai/schemas.js';
 import {
   buildTrainingGradePrompt,
   buildTrainingGradeRepairPrompt,
   buildTrainingMaterialPrompt,
   buildTrainingMaterialRepairPrompt,
+  buildTrainingVariationPrompt,
+  buildTrainingVariationRepairPrompt,
 } from '../ai/prompts.js';
 import { reviewAfterOutcome, selectSessionItems, seoulDate } from '../training/policy.js';
+
+const MAX_VARIATION_PARENTS = 2;
+const MAX_VARIATIONS_PER_PARENT = 3;
+
+// Best-effort: pattern-variation drills are a bonus on top of an already
+// ready session, so any failure here (CLI error, invalid output) is
+// swallowed and never blocks or fails the session itself.
+async function generateSessionVariations(repos, session) {
+  const parents = repos.training.listMasteredWithoutVariation(MAX_VARIATION_PARENTS);
+  if (parents.length === 0) return;
+  try {
+    const generated = await runValidatedStage({
+      cli: session.cli,
+      model: session.model,
+      prompt: buildTrainingVariationPrompt(parents),
+      repairPrompt: (error, failedRaw) => buildTrainingVariationRepairPrompt(parents, error, failedRaw),
+      outputSchema: trainingVariationSchema,
+      phase: '패턴 변형 문장 생성',
+    });
+    if (!generated.ok) return;
+    const parentMap = new Map(parents.map((parent) => [parent.id, parent]));
+    const insertedPerParent = new Map();
+    for (const candidate of generated.value.items) {
+      const parent = parentMap.get(candidate.parent_id);
+      if (!parent) continue;
+      const count = insertedPerParent.get(parent.id) ?? 0;
+      if (count >= MAX_VARIATIONS_PER_PARENT) continue;
+      insertedPerParent.set(parent.id, count + 1);
+      repos.training.insertSentence({
+        source_type: parent.source_type,
+        source_id: parent.source_id,
+        source_snapshot_json: parent.source_snapshot_json,
+        source_sentence: parent.source_sentence,
+        intent_ko: candidate.intent_ko,
+        reference_en: candidate.reference_en,
+        focus_ko: candidate.focus_ko,
+        fingerprint: fingerprint(candidate.reference_en),
+        parent_id: parent.id,
+        variation_kind: candidate.variation_kind,
+      });
+    }
+  } catch {
+    // best-effort — see comment above
+  }
+}
 
 function parseSources(rows) {
   return rows.flatMap((row) => {
@@ -87,7 +134,8 @@ export async function runTrainingSession(repos, sessionId, now = () => new Date(
   let selected = selectSessionItems(sentences, today, 5);
   let rawOutput = session.raw_output;
 
-  const finishReady = () => {
+  const finishReady = async () => {
+    await generateSessionVariations(repos, session);
     repos.training.addSessionItems(sessionId, selected);
     repos.training.setSessionStatus(sessionId, {
       status: 'ready',
@@ -106,14 +154,14 @@ export async function runTrainingSession(repos, sessionId, now = () => new Date(
   };
 
   if (selected.length >= 5) {
-    finishReady();
+    await finishReady();
     return;
   }
 
   const sources = parseSources(repos.training.listSources());
   if (sources.length === 0) {
     if (selected.length > 0) {
-      finishReady();
+      await finishReady();
     } else {
       finishEmpty(
         sentences.length === 0 ? 'NO_SOURCE_RECORDS' : 'NO_DUE_SENTENCES',
@@ -128,7 +176,7 @@ export async function runTrainingSession(repos, sessionId, now = () => new Date(
   const pendingSources = sources.filter((source) => !sourceHasMaterial(source, sentences));
   if (pendingSources.length === 0) {
     if (selected.length > 0) {
-      finishReady();
+      await finishReady();
     } else {
       finishEmpty('NO_DUE_SENTENCES', '오늘 복습할 문장이나 새 문장이 없습니다.');
     }
@@ -172,7 +220,7 @@ export async function runTrainingSession(repos, sessionId, now = () => new Date(
       finishEmpty('NO_DUE_SENTENCES', '오늘 복습할 문장이나 새 문장이 없습니다.');
       return;
     }
-    finishReady();
+    await finishReady();
   } catch (error) {
     repos.training.setSessionStatus(sessionId, {
       status: 'error',
