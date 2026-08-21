@@ -131,6 +131,12 @@ function materialSource(source) {
       recommended_expressions: source.result.recommended_expressions,
     };
   }
+  if (source.source_type === 'note') {
+    return {
+      ...base,
+      memo: source.result.memo,
+    };
+  }
   return {
     ...base,
     corrected: source.result.corrected,
@@ -149,6 +155,7 @@ export function buildTrainingMaterialPrompt(sources) {
     'You create personalized English sentence drills for a Korean OPIc learner.',
     'Use only the completed, parseable source records supplied below.',
     'Prioritize explicit correction reasons first. Use recommended expressions only as secondary material.',
+    'A "note" source is a sentence the learner already saved. Its reference_en should be that sentence, minimally corrected only if it contains an error; derive intent_ko from its meaning and focus_ko from its memo field or the sentence\'s key grammar point.',
     'For each useful item, preserve the exact source_type and source_id from its source record.',
     'Create a compact English source sentence, its Korean intent, one natural reference answer, and one specific learning focus.',
     'The focus should name the tense, word order, grammar rule, or key expression being practiced.',

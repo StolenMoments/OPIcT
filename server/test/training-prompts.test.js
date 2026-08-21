@@ -47,6 +47,24 @@ test('material prompt prioritizes correction reasons, uses expressions second, a
   assert.match(prompt, /alternatives/);
   assert.match(prompt, /explanation_ko/);
   assert.doesNotMatch(prompt, /summary_ko|strengths_ko|improvements_ko|corrected_answer|created_at/);
+  assert.match(prompt, /note.*source/i);
+  assert.match(prompt, /memo/i);
+});
+
+test('material prompt serializes a note source with its memo instead of correction/attempt fields', () => {
+  const prompt = buildTrainingMaterialPrompt([
+    {
+      source_type: 'note',
+      source_id: 3,
+      source_text: 'I have been saving this sentence.',
+      created_at: '2026-08-21 00:00:00',
+      result: { text_en: 'I have been saving this sentence.', memo: '현재완료진행형' },
+    },
+  ]);
+
+  assert.match(prompt, /"source_type":"note"/);
+  assert.match(prompt, /현재완료진행형/);
+  assert.doesNotMatch(prompt, /"corrected"|alternatives|explanation_ko/);
 });
 
 test('grade prompt accepts natural alternatives but requires meaning, grammar, naturalness, and focus', () => {

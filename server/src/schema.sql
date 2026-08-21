@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS settings (
 
 CREATE TABLE IF NOT EXISTS training_sentences (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  source_type TEXT NOT NULL CHECK (source_type IN ('attempt','correction')),
+  source_type TEXT NOT NULL CHECK (source_type IN ('attempt','correction','note')),
   source_id INTEGER NOT NULL,
   source_snapshot_json TEXT NOT NULL,
   source_sentence TEXT NOT NULL,
@@ -63,6 +63,8 @@ CREATE TABLE IF NOT EXISTS training_sentences (
   first_pass_streak INTEGER NOT NULL DEFAULT 0,
   session_count INTEGER NOT NULL DEFAULT 0,
   next_review_on TEXT,
+  parent_id INTEGER REFERENCES training_sentences(id),
+  variation_kind TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

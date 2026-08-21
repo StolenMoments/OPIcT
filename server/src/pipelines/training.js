@@ -11,6 +11,16 @@ import { reviewAfterOutcome, selectSessionItems, seoulDate } from '../training/p
 
 function parseSources(rows) {
   return rows.flatMap((row) => {
+    if (row.source_type === 'note') {
+      if (typeof row.source_text !== 'string' || !row.source_text.trim()) return [];
+      return [{
+        source_type: 'note',
+        source_id: row.id,
+        source_text: row.source_text,
+        created_at: row.created_at,
+        result: { text_en: row.source_text, memo: row.memo ?? null },
+      }];
+    }
     try {
       const result = JSON.parse(row.result_json);
       if (!result || typeof result !== 'object') return [];

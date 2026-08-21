@@ -31,11 +31,65 @@ function migrateAttemptsTable(db) {
   `);
 }
 
+// training_sentences also has no migration system. This one CHECK/column
+// change (adding 'note' to source_type, plus the parent_id/variation_kind
+// columns needed by pattern-variation drills) is folded into a single
+// guarded recreation so a local DB only pays the rename cost once, even
+// though the two features shipped in separate steps. training_session_items
+// holds an incoming FK to this table, so foreign_keys is turned off for the
+// whole rename sequence and the replacement table keeps the final name
+// ("training_sentences") in its own self-referencing parent_id FK — SQLite
+// resolves FK target names by the table's name at enforcement time, not at
+// CREATE TABLE time, so this only becomes consistent (and is only checked)
+// after foreign_keys is turned back on below.
+function migrateTrainingSentencesTable(db) {
+  const table = db.prepare(
+    `SELECT sql FROM sqlite_master WHERE type='table' AND name='training_sentences'`,
+  ).get();
+  if (!table || table.sql.includes("'note'")) return;
+
+  db.pragma('foreign_keys = OFF');
+  db.exec(`
+    CREATE TABLE training_sentences_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_type TEXT NOT NULL CHECK (source_type IN ('attempt','correction','note')),
+      source_id INTEGER NOT NULL,
+      source_snapshot_json TEXT NOT NULL,
+      source_sentence TEXT NOT NULL,
+      intent_ko TEXT NOT NULL,
+      reference_en TEXT NOT NULL,
+      focus_ko TEXT NOT NULL,
+      fingerprint TEXT NOT NULL UNIQUE,
+      mastery_status TEXT NOT NULL DEFAULT 'learning' CHECK (mastery_status IN ('learning','mastered')),
+      first_pass_streak INTEGER NOT NULL DEFAULT 0,
+      session_count INTEGER NOT NULL DEFAULT 0,
+      next_review_on TEXT,
+      parent_id INTEGER REFERENCES training_sentences(id),
+      variation_kind TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    INSERT INTO training_sentences_new
+      (id, source_type, source_id, source_snapshot_json, source_sentence, intent_ko, reference_en,
+       focus_ko, fingerprint, mastery_status, first_pass_streak, session_count, next_review_on,
+       created_at, updated_at)
+      SELECT id, source_type, source_id, source_snapshot_json, source_sentence, intent_ko, reference_en,
+       focus_ko, fingerprint, mastery_status, first_pass_streak, session_count, next_review_on,
+       created_at, updated_at
+      FROM training_sentences;
+    DROP TABLE training_sentences;
+    ALTER TABLE training_sentences_new RENAME TO training_sentences;
+    CREATE INDEX IF NOT EXISTS idx_training_review ON training_sentences(session_count, next_review_on);
+  `);
+  db.pragma('foreign_keys = ON');
+}
+
 export function createDb(file) {
   const db = new Database(file);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.exec(readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
   migrateAttemptsTable(db);
+  migrateTrainingSentencesTable(db);
   return db;
 }

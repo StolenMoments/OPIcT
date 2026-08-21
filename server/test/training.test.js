@@ -384,6 +384,39 @@ test('generated sentence keeps its source snapshot when the original record resu
   assert.match(before, /I have been jogging for two years/);
 });
 
+test('session material includes a saved note as a source, and editing the note changes its source version', async (t) => {
+  const app = await prepareApp(t);
+  const category = app.repos.categories.create({ type: 'survey', name: '노트', sort_order: 0 });
+  const note = app.repos.sentences.create({
+    category_id: category.id,
+    text_en: 'I have been saving this sentence.',
+    memo: '현재완료진행형',
+    source: 'manual',
+  });
+
+  const session = await createReadySession(app);
+  assert.equal(session.status, 'ready');
+  const noteItem = session.items.find((item) => item.source_type === 'note');
+  assert.ok(noteItem, 'expected a note-sourced item in the session');
+  assert.equal(noteItem.source_id, note.id);
+  assert.ok(noteItem.intent_ko && noteItem.focus_ko);
+
+  const beforeVersion = sourceVersion({
+    source_type: 'note',
+    source_id: note.id,
+    source_text: note.text_en,
+    result: { text_en: note.text_en, memo: note.memo },
+  });
+  const edited = app.repos.sentences.update(note.id, { text_en: 'I have been saving this sentence for years.', memo: note.memo });
+  const afterVersion = sourceVersion({
+    source_type: 'note',
+    source_id: edited.id,
+    source_text: edited.text_en,
+    result: { text_en: edited.text_en, memo: edited.memo },
+  });
+  assert.notEqual(beforeVersion, afterVersion);
+});
+
 test('session creation requires configured defaults and training routes are authenticated', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());

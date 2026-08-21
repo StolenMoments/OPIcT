@@ -85,7 +85,7 @@ export const trainingMaterialSchema = {
       items: {
         type: 'object',
         properties: {
-          source_type: { type: 'string', enum: ['attempt', 'correction'] },
+          source_type: { type: 'string', enum: ['attempt', 'correction', 'note'] },
           source_id: { type: 'integer', minimum: 1 },
           source_sentence: { type: 'string', minLength: 1 },
           intent_ko: { type: 'string', minLength: 1 },

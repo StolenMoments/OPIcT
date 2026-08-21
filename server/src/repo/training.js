@@ -54,7 +54,11 @@ export function trainingRepo(db) {
          FROM corrections WHERE status='done' AND result_json IS NOT NULL
          ORDER BY id DESC LIMIT ?`,
       ).all(limit);
-      return [...attempts, ...corrections]
+      const notes = db.prepare(
+        `SELECT id, 'note' AS source_type, text_en AS source_text, memo, created_at
+         FROM sentences ORDER BY id DESC LIMIT ?`,
+      ).all(limit);
+      return [...attempts, ...corrections, ...notes]
         .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id - a.id)
         .slice(0, limit);
     },

@@ -15,6 +15,16 @@ process.stdin.on('end', () => {
         focus_ko: '과거 시점을 나타내는 went 사용',
       });
     }
+    if (input.includes('"source_type":"note"')) {
+      items.push({
+        source_type: 'note',
+        source_id: 1,
+        source_sentence: 'I have been saving this sentence.',
+        intent_ko: '나는 이 문장을 저장해왔다.',
+        reference_en: 'I have been saving this sentence.',
+        focus_ko: '메모에서 도출한 학습 초점',
+      });
+    }
     if (input.includes('"source_type":"correction"')) {
       items.push({
         source_type: 'correction',
