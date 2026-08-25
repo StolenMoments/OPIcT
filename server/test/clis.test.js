@@ -24,7 +24,7 @@ test('CLI별 effort로 호출된다', () => {
 
 test('실행 파일은 .cmd 래퍼보다 .exe 후보를 먼저 쓴다', () => {
   for (const [name, def] of Object.entries(CLIS)) {
-    const candidates = def.bin();
+    const candidates = def.bin('win32');
     assert.ok(candidates.length > 1, name);
     assert.ok(!/\.(cmd|bat)$/i.test(candidates[0]), `${name}: ${candidates[0]}`);
   }
