@@ -1,9 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync, rmSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CLIS } from '../src/ai/clis.js';
-import { buildInvocation } from '../src/ai/runner.js';
+import { buildInvocation, runCli, schemaFileFor } from '../src/ai/runner.js';
 import { evaluationResultSchema } from '../src/ai/schemas.js';
+
+const CWD_STUB = fileURLToPath(new URL('./fixtures/stub-cli-cwd.js', import.meta.url));
 
 test('CLI별 effort로 호출된다', () => {
   const claude = CLIS.claude.argv(CLIS.claude.models[0]);
@@ -23,6 +27,12 @@ test('실행 파일은 .cmd 래퍼보다 .exe 후보를 먼저 쓴다', () => {
     const candidates = def.bin();
     assert.ok(candidates.length > 1, name);
     assert.ok(!/\.(cmd|bat)$/i.test(candidates[0]), `${name}: ${candidates[0]}`);
+  }
+});
+
+test('Linux에서는 설치된 CLI를 PATH의 명령명으로 직접 호출한다', () => {
+  for (const [name, def] of Object.entries(CLIS)) {
+    assert.deepEqual(def.bin('linux'), [name]);
   }
 });
 
@@ -60,6 +70,18 @@ test('스텁이 설정되면 어떤 CLI든 stdin 방식으로 실행된다', () 
   assert.equal(inv.stdinPrompt, 'p');
 });
 
+test('CLI는 서버 프로세스의 현재 작업 디렉터리에서 실행된다', async () => {
+  const previousStub = process.env.OPICT_CLI_STUB;
+  process.env.OPICT_CLI_STUB = CWD_STUB;
+  try {
+    const cwd = await runCli({ cli: 'agy', model: 'gemini-3.7-flash', prompt: 'p' });
+    assert.equal(cwd.trim(), process.cwd());
+  } finally {
+    if (previousStub === undefined) delete process.env.OPICT_CLI_STUB;
+    else process.env.OPICT_CLI_STUB = previousStub;
+  }
+});
+
 test('Claude receives the native JSON schema option', () => {
   const inv = buildInvocation({
     cli: 'claude',
@@ -84,6 +106,16 @@ test('Codex receives an absolute output schema file', () => {
 
   assert.notEqual(index, -1);
   assert.ok(isAbsolute(inv.args[index + 1]));
+});
+
+test('Codex schema file is recreated after temporary-file cleanup', () => {
+  const schema = { type: 'object', properties: { nonce: { const: Date.now() } } };
+  const firstPath = schemaFileFor(schema);
+  rmSync(firstPath);
+
+  const recreatedPath = schemaFileFor(schema);
+  assert.equal(recreatedPath, firstPath);
+  assert.equal(existsSync(recreatedPath), true);
 });
 
 test('Antigravity does not receive a native schema option', () => {
