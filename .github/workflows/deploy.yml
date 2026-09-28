@@ -91,6 +91,24 @@ jobs:
           df -i /home/opc/opict
           REMOTE
 
+      - name: Ensure Claude CLI is available
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          export PATH="/home/opc/.local/bin:$PATH"
+          if ! command -v claude >/dev/null 2>&1; then
+            echo 'Claude CLI is missing; installing it with the official installer.'
+            curl -fsSL https://claude.ai/install.sh | bash
+          fi
+          command -v claude
+          claude --version
+          REMOTE
+
       - name: Rsync source to server
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}

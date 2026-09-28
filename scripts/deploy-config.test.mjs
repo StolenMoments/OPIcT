@@ -98,17 +98,24 @@ test('workflow tests master before deploying and preserves server state during r
 test('workflow clears targeted package caches before rsync when disk or inode use is critical', () => {
   const workflow = read('.github/workflows/deploy.yml');
   const cleanupStart = workflow.indexOf('name: Clear package caches when server storage is critical');
+  const claudeStart = workflow.indexOf('name: Ensure Claude CLI is available');
   const rsyncStart = workflow.indexOf('name: Rsync source to server');
 
   assert.notEqual(cleanupStart, -1);
-  assert.ok(cleanupStart < rsyncStart, 'cache cleanup must run before rsync');
-  const cleanupStep = workflow.slice(cleanupStart, rsyncStart);
+  assert.notEqual(claudeStart, -1);
+  assert.ok(cleanupStart < claudeStart && claudeStart < rsyncStart,
+    'storage recovery and required CLI setup must run before rsync');
+  const cleanupStep = workflow.slice(cleanupStart, claudeStart);
   assert.match(cleanupStep, /df -P \/home\/opc\/opict/);
   assert.match(cleanupStep, /df -Pi \/home\/opc\/opict/);
   assert.match(cleanupStep, /disk_pct >= 95 \|\| inode_pct >= 95/);
   assert.match(cleanupStep, /--cache \/home\/opc\/\.npm cache clean --force/);
   assert.match(cleanupStep, /--cache \/root\/\.npm cache clean --force/);
   assert.match(cleanupStep, /dnf clean all/);
+  const claudeStep = workflow.slice(claudeStart, rsyncStart);
+  assert.match(claudeStep, /if ! command -v claude/);
+  assert.match(claudeStep, /curl -fsSL https:\/\/claude\.ai\/install\.sh \| bash/);
+  assert.match(claudeStep, /claude --version/);
 });
 
 test('environment example documents the production whisper paths and timezone', () => {
