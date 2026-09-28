@@ -95,6 +95,22 @@ test('workflow tests master before deploying and preserves server state during r
   assert.match(workflow, /--exclude='web\/dist\/'/);
 });
 
+test('workflow clears targeted package caches before rsync when disk or inode use is critical', () => {
+  const workflow = read('.github/workflows/deploy.yml');
+  const cleanupStart = workflow.indexOf('name: Clear package caches when server storage is critical');
+  const rsyncStart = workflow.indexOf('name: Rsync source to server');
+
+  assert.notEqual(cleanupStart, -1);
+  assert.ok(cleanupStart < rsyncStart, 'cache cleanup must run before rsync');
+  const cleanupStep = workflow.slice(cleanupStart, rsyncStart);
+  assert.match(cleanupStep, /df -P \/home\/opc\/opict/);
+  assert.match(cleanupStep, /df -Pi \/home\/opc\/opict/);
+  assert.match(cleanupStep, /disk_pct >= 95 \|\| inode_pct >= 95/);
+  assert.match(cleanupStep, /--cache \/home\/opc\/\.npm cache clean --force/);
+  assert.match(cleanupStep, /--cache \/root\/\.npm cache clean --force/);
+  assert.match(cleanupStep, /dnf clean all/);
+});
+
 test('environment example documents the production whisper paths and timezone', () => {
   const envExample = read('.env.example');
 

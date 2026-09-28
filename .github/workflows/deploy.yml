@@ -64,6 +64,33 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H -p "${SSH_PORT:-22}" "$SSH_HOST" >> ~/.ssh/known_hosts
 
+      - name: Clear package caches when server storage is critical
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          disk_pct="$(df -P /home/opc/opict | awk 'NR == 2 { gsub(/%/, "", $5); print $5 }')"
+          inode_pct="$(df -Pi /home/opc/opict | awk 'NR == 2 { gsub(/%/, "", $5); print $5 }')"
+          printf 'Deploy filesystem usage: %s%% blocks, %s%% inodes\n' "$disk_pct" "$inode_pct"
+
+          if (( disk_pct >= 95 || inode_pct >= 95 )); then
+            npm_path="$(command -v npm)"
+            echo 'Storage is critical; clearing only the requested npm and DNF caches.'
+            npm --cache /home/opc/.npm cache clean --force
+            sudo -n "$npm_path" --cache /root/.npm cache clean --force
+            sudo -n dnf clean all
+          else
+            echo 'Storage is below the cleanup threshold; package caches were left intact.'
+          fi
+
+          df -h /home/opc/opict
+          df -i /home/opc/opict
+          REMOTE
+
       - name: Rsync source to server
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
