@@ -100,6 +100,28 @@ test('text-mode attempt retry resets to evaluating (not uploaded) and reruns wit
   assert.equal(retried.transcript, scriptText);
 });
 
+test('retry preserves the model stored on a historical Antigravity attempt', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const category = (await app.inject({ method: 'POST', url: '/api/categories',
+    payload: { type: 'survey', name: 'Travel' } })).json();
+  const question = (await app.inject({ method: 'POST', url: '/api/questions',
+    payload: { category_id: category.id, text: 'Describe a trip.' } })).json();
+  const { id } = app.repos.attempts.create({
+    question_id: question.id,
+    input_mode: 'text',
+    transcript: 'I visited Busan last summer.',
+    status: 'error',
+    cli: 'agy',
+    model: 'gemini-3.7-flash',
+  });
+
+  const retry = await app.inject({ method: 'POST', url: `/api/attempts/${id}/retry` });
+  assert.equal(retry.statusCode, 202);
+  assert.equal((await waitDone(app, `/api/attempts/${id}`)).status, 'done');
+  assert.equal(app.repos.attempts.get(id).model, 'gemini-3.7-flash');
+});
+
 test('retry and audio routes return 404 for missing records', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());

@@ -84,6 +84,11 @@ function migrateTrainingSentencesTable(db) {
   db.pragma('foreign_keys = ON');
 }
 
+function migrateLegacyAgyDefault(db) {
+  db.prepare('UPDATE settings SET value=? WHERE key=? AND value=?')
+    .run('gemini-3.8-flash-low', 'default_model_agy', 'gemini-3.7-flash');
+}
+
 export function createDb(file) {
   const db = new Database(file);
   db.pragma('journal_mode = WAL');
@@ -91,5 +96,6 @@ export function createDb(file) {
   db.exec(readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
   migrateAttemptsTable(db);
   migrateTrainingSentencesTable(db);
+  migrateLegacyAgyDefault(db);
   return db;
 }
