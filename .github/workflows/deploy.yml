@@ -91,7 +91,7 @@ jobs:
           df -i /home/opc/opict
           REMOTE
 
-      - name: Ensure Claude CLI is available
+      - name: Ensure required AI CLIs are available
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
@@ -105,8 +105,18 @@ jobs:
             echo 'Claude CLI is missing; installing it with the official installer.'
             curl -fsSL https://claude.ai/install.sh | bash
           fi
-          command -v claude
-          claude --version
+          if ! command -v codex >/dev/null 2>&1; then
+            echo 'Codex CLI is missing; installing it with the official installer.'
+            curl -fsSL https://chatgpt.com/codex/install.sh | sh
+          fi
+          if ! command -v agy >/dev/null 2>&1; then
+            echo 'Antigravity CLI is missing; installing it with the official installer.'
+            curl -fsSL https://antigravity.google/cli/install.sh | bash
+          fi
+          for cli in claude codex agy; do
+            command -v "$cli"
+            "$cli" --version
+          done
           REMOTE
 
       - name: Rsync source to server

@@ -98,7 +98,7 @@ test('workflow tests master before deploying and preserves server state during r
 test('workflow clears targeted package caches before rsync when disk or inode use is critical', () => {
   const workflow = read('.github/workflows/deploy.yml');
   const cleanupStart = workflow.indexOf('name: Clear package caches when server storage is critical');
-  const claudeStart = workflow.indexOf('name: Ensure Claude CLI is available');
+  const claudeStart = workflow.indexOf('name: Ensure required AI CLIs are available');
   const rsyncStart = workflow.indexOf('name: Rsync source to server');
 
   assert.notEqual(cleanupStart, -1);
@@ -112,10 +112,14 @@ test('workflow clears targeted package caches before rsync when disk or inode us
   assert.match(cleanupStep, /--cache \/home\/opc\/\.npm cache clean --force/);
   assert.match(cleanupStep, /--cache \/root\/\.npm cache clean --force/);
   assert.match(cleanupStep, /dnf clean all/);
-  const claudeStep = workflow.slice(claudeStart, rsyncStart);
-  assert.match(claudeStep, /if ! command -v claude/);
-  assert.match(claudeStep, /curl -fsSL https:\/\/claude\.ai\/install\.sh \| bash/);
-  assert.match(claudeStep, /claude --version/);
+  const cliStep = workflow.slice(claudeStart, rsyncStart);
+  assert.match(cliStep, /if ! command -v claude/);
+  assert.match(cliStep, /curl -fsSL https:\/\/claude\.ai\/install\.sh \| bash/);
+  assert.match(cliStep, /if ! command -v codex/);
+  assert.match(cliStep, /curl -fsSL https:\/\/chatgpt\.com\/codex\/install\.sh \| sh/);
+  assert.match(cliStep, /if ! command -v agy/);
+  assert.match(cliStep, /curl -fsSL https:\/\/antigravity\.google\/cli\/install\.sh \| bash/);
+  assert.match(cliStep, /"\$cli" --version/);
 });
 
 test('environment example documents the production whisper paths and timezone', () => {
