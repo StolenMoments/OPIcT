@@ -122,6 +122,20 @@ test('workflow clears targeted package caches before rsync when disk or inode us
   assert.match(cliStep, /"\$cli" --version/);
 });
 
+test('manual production verification checks the migrated default, live model call, and storage', () => {
+  const workflow = read('.github/workflows/verify-model.yml');
+
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /default_model_agy/);
+  assert.match(workflow, /gemini-3\.8-flash-low/);
+  assert.match(workflow, /agy models/);
+  assert.match(workflow, /--effort low/);
+  assert.match(workflow, /api\/health/);
+  assert.match(workflow, /df -h/);
+  assert.match(workflow, /df -i/);
+  assert.match(workflow, /du -sh/);
+});
+
 test('environment example documents the production whisper paths and timezone', () => {
   const envExample = read('.env.example');
 
@@ -140,6 +154,7 @@ test('Linux deployment files use LF line endings', () => {
     'deploy/nginx/opict.mygreed.shop.conf',
     'deploy/nginx/opict.mygreed.shop.http.conf',
     '.github/workflows/deploy.yml',
+    '.github/workflows/verify-model.yml',
   ]) {
     assert.doesNotMatch(read(relativePath), /\r/);
   }

@@ -1,0 +1,59 @@
+name: Verify production Gemini model
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          set -euo pipefail
+          : "${SSH_HOST:?SSH_HOST secret is not set}"
+          : "${SSH_PRIVATE_KEY:?SSH_PRIVATE_KEY secret is not set}"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H -p "${SSH_PORT:-22}" "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Verify migrated setting, Antigravity request, health, and storage
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -p "${SSH_PORT:-22}" "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          export PATH="/home/opc/.local/bin:/usr/local/bin:/usr/bin:/bin"
+          cd /home/opc/opict/server
+
+          node --input-type=module - <<'NODE'
+          import Database from 'better-sqlite3';
+          const db = new Database('data/opict.db', { readonly: true, fileMustExist: true });
+          const row = db.prepare("SELECT value FROM settings WHERE key='default_model_agy'").get();
+          db.close();
+          if (row?.value !== 'gemini-3.8-flash-low') {
+            throw new Error(`Unexpected default_model_agy: ${row?.value ?? '<missing>'}`);
+          }
+          console.log(`default_model_agy=${row.value}`);
+          NODE
+
+          agy models | grep -F -- 'gemini-3.8-flash-low'
+          response="$(agy -p 'Reply with exactly OK.' --model gemini-3.8-flash-low --effort low --print-timeout 90s)"
+          test -n "$response"
+          printf 'Antigravity smoke response: %s\n' "$response"
+          curl -fsS --max-time 5 http://127.0.0.1:3001/api/health
+          printf '\nPackage cache sizes:\n'
+          for cache in /root/.npm/_cacache /home/opc/.npm/_cacache /var/cache/dnf; do
+            sudo -n du -sh "$cache" 2>/dev/null || true
+          done
+          df -h /home/opc/opict
+          df -i /home/opc/opict
+          REMOTE
