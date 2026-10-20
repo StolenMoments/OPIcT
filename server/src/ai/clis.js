@@ -50,7 +50,7 @@ export const CLIS = {
   },
   codex: {
     label: 'Codex CLI',
-    models: ['gpt-5.6-luna'],
+    models: ['gpt-6-luna'],
     promptMode: 'stdin',
     bin: (platform = process.platform) => platform === 'win32'
       ? [codexVendor('x86_64-pc-windows-msvc', 'x64'),

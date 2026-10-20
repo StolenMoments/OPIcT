@@ -1,9 +1,32 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
+import { setTimeout } from 'node:timers/promises';
 import { buildApp } from '../src/app.js';
 
 process.env.OPICT_CLI_STUB = fileURLToPath(new URL('./fixtures/stub-cli.js', import.meta.url));
+
+test('Codex corrections use the saved GPT-6 Luna default', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const saved = await app.inject({ method: 'PUT', url: '/api/settings',
+    payload: { default_cli: 'codex', default_model_codex: 'gpt-6-luna' } });
+  assert.equal(saved.statusCode, 200);
+  const response = await app.inject({ method: 'POST', url: '/api/corrections',
+    payload: { input_text: 'I go yesterday.' } });
+  assert.equal(response.statusCode, 202);
+  const url = `/api/corrections/${response.json().id}`;
+  let result;
+  const deadline = Date.now() + 5000;
+  do {
+    result = (await app.inject({ url })).json();
+    if (result.status === 'done' || result.status === 'error') break;
+    await setTimeout(50);
+  } while (Date.now() < deadline);
+  assert.equal(result.cli, 'codex');
+  assert.equal(result.model, 'gpt-6-luna');
+  assert.equal(result.status, 'done');
+});
 
 test('settings upsert and read', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });

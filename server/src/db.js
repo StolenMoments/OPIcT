@@ -89,6 +89,11 @@ function migrateLegacyAgyDefault(db) {
     .run('gemini-3.8-flash-low', 'default_model_agy', 'gemini-3.7-flash');
 }
 
+function migrateLegacyCodexDefault(db) {
+  db.prepare('UPDATE settings SET value=? WHERE key=? AND value=?')
+    .run('gpt-6-luna', 'default_model_codex', 'gpt-5.6-luna');
+}
+
 export function createDb(file) {
   const db = new Database(file);
   db.pragma('journal_mode = WAL');
@@ -97,5 +102,6 @@ export function createDb(file) {
   migrateAttemptsTable(db);
   migrateTrainingSentencesTable(db);
   migrateLegacyAgyDefault(db);
+  migrateLegacyCodexDefault(db);
   return db;
 }

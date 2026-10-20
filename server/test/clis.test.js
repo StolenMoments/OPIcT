@@ -15,6 +15,8 @@ test('CLI별 effort로 호출된다', () => {
     ['--effort', 'medium']);
 
   const codex = CLIS.codex.argv(CLIS.codex.models[0]);
+  assert.deepEqual(CLIS.codex.models, ['gpt-6-luna']);
+  assert.equal(codex[codex.indexOf('--model') + 1], 'gpt-6-luna');
   assert.ok(codex.includes('model_reasoning_effort="high"'), codex.join(' '));
 
   const agy = CLIS.agy.argv(CLIS.agy.models[0], 'x');
