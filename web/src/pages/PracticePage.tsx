@@ -36,7 +36,6 @@ export default function PracticePage({ visible = true }: { visible?: boolean }) 
   const [questions, setQuestions] = useState<Question[] | null>(null);
   const [q, setQ] = useState<Question | null>(null);
   const [cli, setCli] = useState("");
-  const [model, setModel] = useState("");
   const [mode, setMode] = useState<"record" | "text">("record");
   const [scriptText, setScriptText] = useState("");
   const [attemptId, setAttemptId] = useState<number | null>(null);
@@ -80,7 +79,6 @@ export default function PracticePage({ visible = true }: { visible?: boolean }) 
       if (qRef.current) return;
       if (s.default_cli) {
         setCli(s.default_cli);
-        setModel(s[`default_model_${s.default_cli}`] ?? "");
       }
       if (s.default_input_mode === "text" || s.default_input_mode === "record") {
         setMode(s.default_input_mode);
@@ -159,7 +157,6 @@ export default function PracticePage({ visible = true }: { visible?: boolean }) 
         form.append("question_id", String(questionId));
         if (cli) {
           form.append("cli", cli);
-          form.append("model", model);
         }
         const { id } = await api<{ id: number }>("/attempts", {
           method: "POST",
@@ -192,7 +189,7 @@ export default function PracticePage({ visible = true }: { visible?: boolean }) 
           body: JSON.stringify({
             question_id: questionId,
             script_text: text,
-            ...(cli ? { cli, model } : {}),
+            ...(cli ? { cli } : {}),
           }),
         });
         if (qRef.current?.id === questionId) {
@@ -272,12 +269,7 @@ export default function PracticePage({ visible = true }: { visible?: boolean }) 
             <span className="console-label">평가 채널</span>
             <CliPicker
               cli={cli}
-              model={model}
-              showModel={false}
-              onChange={(c, m) => {
-                setCli(c);
-                setModel(m);
-              }}
+              onChange={setCli}
             />
           </section>
 

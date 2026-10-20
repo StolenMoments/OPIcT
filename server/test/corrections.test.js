@@ -24,6 +24,17 @@ async function waitDone(app, url, timeoutMs = 5000) {
   throw new Error('timeout waiting for done');
 }
 
+test('a stale Codex correction request uses GPT-6 Luna', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const response = await app.inject({ method: 'POST', url: '/api/corrections',
+    payload: { input_text: 'I go yesterday.', cli: 'codex', model: 'gpt-5.6-luna' } });
+  assert.equal(response.statusCode, 202);
+  const row = await waitDone(app, `/api/corrections/${response.json().id}`);
+  assert.equal(row.status, 'done');
+  assert.equal(row.model, 'gpt-6-luna');
+});
+
 test('correction pipeline with stub cli', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());
@@ -120,12 +131,15 @@ test('unknown cli rejected', async (t) => {
   assert.equal(res.statusCode, 400);
 });
 
-test('model outside cli allowlist rejected', async (t) => {
+test('client model selection cannot override the server model', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());
   const res = await app.inject({ method: 'POST', url: '/api/corrections',
     payload: { input_text: 'x', cli: 'claude', model: 'not-a-real-model; rm -rf /' } });
-  assert.equal(res.statusCode, 400);
+  assert.equal(res.statusCode, 202);
+  const row = await waitDone(app, `/api/corrections/${res.json().id}`);
+  assert.equal(row.model, 'claude-sonnet-5');
+  assert.equal(row.status, 'done');
 });
 
 test('unparseable cli output preserves raw_output', async (t) => {

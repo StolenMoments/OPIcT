@@ -10,15 +10,16 @@ function formatValidationFailure(phase, error) {
   return `${phase} JSON 파싱 실패 또는 Schema 검증 실패 — 자동 재시도 실패 (${error}) — 원문 보기를 확인하세요`;
 }
 
-export async function runCorrection(repos, id) {
+export async function runCorrection(repos, id, modelOverride) {
   const row = repos.corrections.get(id);
+  const model = modelOverride ?? row.model;
   repos.corrections.setStatus(id, { status: 'running', error_message: null });
   let initialRaw = null;
 
   try {
     const initial = await runValidatedStage({
       cli: row.cli,
-      model: row.model,
+      model,
       prompt: buildCorrectionPrompt(row.input_text),
       repairPrompt: (error, failedRaw) => buildCorrectionRepairPrompt(row.input_text, error, failedRaw),
       outputSchema: correctionResultSchema,
@@ -38,7 +39,7 @@ export async function runCorrection(repos, id) {
     repos.corrections.setStatus(id, { status: 'verifying', error_message: null });
     const verified = await runValidatedStage({
       cli: row.cli,
-      model: row.model,
+      model,
       prompt: buildCorrectionVerificationPrompt(row.input_text, initial.value),
       repairPrompt: (error, failedRaw) => buildCorrectionRepairPrompt(row.input_text, error, failedRaw),
       outputSchema: correctionResultSchema,
@@ -57,6 +58,7 @@ export async function runCorrection(repos, id) {
 
     repos.corrections.setStatus(id, {
       status: 'done',
+      model,
       result_json: JSON.stringify(verified.value),
       raw_output: rawOutput,
       error_message: null,

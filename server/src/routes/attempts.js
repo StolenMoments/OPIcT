@@ -4,7 +4,7 @@ import { mkdir, unlink } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CLIS } from '../ai/clis.js';
+import { getCliModel } from '../ai/clis.js';
 import { enqueue } from '../ai/queue.js';
 import { runAttempt } from '../pipelines/attempt.js';
 import { parsePaginationQuery } from './pagination.js';
@@ -21,10 +21,10 @@ export async function attemptsRoutes(app) {
       const scriptText = typeof body.script_text === 'string' ? body.script_text.trim() : '';
       const s = repos.settings.getAll();
       const cli = body.cli || s.default_cli;
-      const model = body.model || (CLIS[cli] ? s[`default_model_${cli}`] : undefined);
+      const model = getCliModel(cli);
       const question = body.question_id && repos.questions.get(body.question_id);
-      if (!scriptText || !question || !CLIS[cli] || !model || !CLIS[cli].models.includes(model)) {
-        return reply.code(400).send({ error: 'script_text, 유효한 question_id, cli/model(또는 기본값 설정)이 필요합니다' });
+      if (!scriptText || !question || !model) {
+        return reply.code(400).send({ error: 'script_text, 유효한 question_id, cli(또는 기본 CLI 설정)이 필요합니다' });
       }
       const row = repos.attempts.create({
         question_id: question.id, input_mode: 'text', transcript: scriptText, status: 'evaluating', cli, model,
@@ -56,11 +56,11 @@ export async function attemptsRoutes(app) {
     }
     const s = repos.settings.getAll();
     const cli = fields.cli || s.default_cli;
-    const model = fields.model || (CLIS[cli] ? s[`default_model_${cli}`] : undefined);
+    const model = getCliModel(cli);
     const question = fields.question_id && repos.questions.get(fields.question_id);
-    if (!audioPath || !question || !CLIS[cli] || !model || !CLIS[cli].models.includes(model)) {
+    if (!audioPath || !question || !model) {
       if (audioPath) await unlink(audioPath).catch(() => {});
-      return reply.code(400).send({ error: 'audio 파일, 유효한 question_id, cli/model(또는 기본값 설정)이 필요합니다' });
+      return reply.code(400).send({ error: 'audio 파일, 유효한 question_id, cli(또는 기본 CLI 설정)이 필요합니다' });
     }
 
     const row = repos.attempts.create({ question_id: question.id, audio_path: audioPath, cli, model });

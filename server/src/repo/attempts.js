@@ -27,7 +27,7 @@ export function attemptsRepo(db) {
     setStatus(id, changes) {
       const fields = ['status=?'];
       const values = [changes.status];
-      for (const field of ['transcript', 'result_json', 'raw_output', 'error_message']) {
+      for (const field of ['model', 'transcript', 'result_json', 'raw_output', 'error_message']) {
         if (Object.hasOwn(changes, field)) {
           fields.push(`${field}=?`);
           values.push(changes[field]);

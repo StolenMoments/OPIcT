@@ -10,19 +10,19 @@ import { evaluationResultSchema } from '../src/ai/schemas.js';
 const CWD_STUB = fileURLToPath(new URL('./fixtures/stub-cli-cwd.js', import.meta.url));
 
 test('CLI별 effort로 호출된다', () => {
-  const claude = CLIS.claude.argv(CLIS.claude.models[0]);
+  const claude = CLIS.claude.argv(CLIS.claude.model);
   assert.deepEqual(claude.slice(claude.indexOf('--effort'), claude.indexOf('--effort') + 2),
     ['--effort', 'medium']);
 
-  const codex = CLIS.codex.argv(CLIS.codex.models[0]);
-  assert.deepEqual(CLIS.codex.models, ['gpt-6-luna']);
+  const codex = CLIS.codex.argv(CLIS.codex.model);
+  assert.equal(CLIS.codex.model, 'gpt-6-luna');
   assert.equal(codex[codex.indexOf('--model') + 1], 'gpt-6-luna');
   assert.ok(codex.includes('model_reasoning_effort="high"'), codex.join(' '));
 
-  const agy = CLIS.agy.argv(CLIS.agy.models[0], 'x');
+  const agy = CLIS.agy.argv(CLIS.agy.model, 'x');
   assert.deepEqual(agy.slice(agy.indexOf('--effort'), agy.indexOf('--effort') + 2),
     ['--effort', 'low']);
-  assert.deepEqual(CLIS.agy.models, ['gemini-3.8-flash-low']);
+  assert.equal(CLIS.agy.model, 'gemini-3.8-flash-low');
 });
 
 test('실행 파일은 .cmd 래퍼보다 .exe 후보를 먼저 쓴다', () => {
@@ -41,7 +41,7 @@ test('Linux에서는 설치된 CLI를 PATH의 명령명으로 직접 호출한�
 
 test('셸은 .cmd 래퍼로 떨어졌을 때만 켠다', () => {
   for (const cli of Object.keys(CLIS)) {
-    const inv = buildInvocation({ cli, model: CLIS[cli].models[0], prompt: 'p' });
+    const inv = buildInvocation({ cli, model: CLIS[cli].model, prompt: 'p' });
     assert.equal(inv.opts.shell, /\.(cmd|bat)$/i.test(inv.cmd), `${cli}: ${inv.cmd}`);
   }
 });
@@ -60,7 +60,7 @@ test('agy는 프롬프트를 -p 인자로 원문 그대로 받고 stdin으로는
 test('stdin 방식 CLI는 프롬프트를 원문 그대로 stdin으로 보낸다', () => {
   const prompt = 'line one\nline two';
   for (const cli of ['claude', 'codex']) {
-    const inv = buildInvocation({ cli, model: CLIS[cli].models[0], prompt });
+    const inv = buildInvocation({ cli, model: CLIS[cli].model, prompt });
     assert.equal(inv.stdinPrompt, prompt, cli);
     assert.ok(!JSON.stringify(inv.args).includes('line one'), cli);
   }
@@ -88,7 +88,7 @@ test('CLI는 서버 프로세스의 현재 작업 디렉터리에서 실행된�
 test('Claude receives the native JSON schema option', () => {
   const inv = buildInvocation({
     cli: 'claude',
-    model: CLIS.claude.models[0],
+    model: CLIS.claude.model,
     prompt: 'p',
     outputSchema: evaluationResultSchema,
   });
@@ -101,7 +101,7 @@ test('Claude receives the native JSON schema option', () => {
 test('Codex receives an absolute output schema file', () => {
   const inv = buildInvocation({
     cli: 'codex',
-    model: CLIS.codex.models[0],
+    model: CLIS.codex.model,
     prompt: 'p',
     outputSchema: evaluationResultSchema,
   });
@@ -124,7 +124,7 @@ test('Codex schema file is recreated after temporary-file cleanup', () => {
 test('Antigravity does not receive a native schema option', () => {
   const inv = buildInvocation({
     cli: 'agy',
-    model: CLIS.agy.models[0],
+    model: CLIS.agy.model,
     prompt: 'p',
     outputSchema: evaluationResultSchema,
   });

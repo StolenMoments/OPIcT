@@ -48,6 +48,7 @@ describe('PracticePage representative recording flow', () => {
       }
       if (path === '/meta/clis') return [{ name: 'codex', label: 'Codex', models: ['gpt'] }];
       if (path === '/attempts' && init?.method === 'POST') {
+        expect((init.body as FormData).has('model')).toBe(false);
         return new Promise<{ id: number }>((resolve) => {
           finishUpload = resolve;
         });
@@ -78,11 +79,10 @@ describe('PracticePage representative recording flow', () => {
       }
       if (path === '/meta/clis') return [{ name: 'codex', label: 'Codex', models: ['gpt-5', 'gpt-4'] }];
       if (path === '/attempts' && init?.method === 'POST') {
-        expect(JSON.parse(init.body as string)).toMatchObject({
+        expect(JSON.parse(init.body as string)).toEqual({
           question_id: 7,
           script_text: 'I had a quiet day at home.',
           cli: 'codex',
-          model: 'gpt-5',
         });
         return new Promise<{ id: number }>((resolve) => {
           finishSubmit = resolve;

@@ -38,14 +38,12 @@ export default function SettingsPage({ onLogout }: { onLogout: () => void }) {
   }, []);
 
   const [defCli, setDefCli] = useState('');
-  const [defModel, setDefModel] = useState('');
   const [defInputMode, setDefInputMode] = useState<'record' | 'text'>('record');
   useEffect(() => {
     api<Record<string, string>>('/settings')
       .then((settings) => {
         if (settings.default_cli) {
           setDefCli(settings.default_cli);
-          setDefModel(settings[`default_model_${settings.default_cli}`] ?? '');
         }
         if (settings.default_input_mode === 'text') {
           setDefInputMode('text');
@@ -57,7 +55,7 @@ export default function SettingsPage({ onLogout }: { onLogout: () => void }) {
     guard(async () => {
       await api('/settings', {
         method: 'PUT',
-        body: JSON.stringify({ default_cli: defCli, [`default_model_${defCli}`]: defModel }),
+        body: JSON.stringify({ default_cli: defCli }),
       });
       toast.success('기본 평가 채널을 저장했습니다.');
     });
@@ -219,17 +217,13 @@ export default function SettingsPage({ onLogout }: { onLogout: () => void }) {
         </section>
 
         <section className="section section--wide">
-          <h3 className="section__title">기본 CLI·모델</h3>
+          <h3 className="section__title">기본 CLI</h3>
           <div className="section__row">
             <CliPicker
               cli={defCli}
-              model={defModel}
-              onChange={(cli, model) => {
-                setDefCli(cli);
-                setDefModel(model);
-              }}
+              onChange={setDefCli}
             />
-            <Button onClick={saveDefaults} disabled={!defCli || !defModel}>
+            <Button onClick={saveDefaults} disabled={!defCli}>
               저장
             </Button>
           </div>

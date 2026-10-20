@@ -1,4 +1,4 @@
-import { CLIS } from '../ai/clis.js';
+import { getCliModel } from '../ai/clis.js';
 import { enqueue } from '../ai/queue.js';
 import { runTrainingAnswer, runTrainingSession } from '../pipelines/training.js';
 
@@ -91,10 +91,10 @@ export async function trainingRoutes(app) {
     }
     const settings = repos.settings.getAll();
     const cli = settings.default_cli;
-    const model = CLIS[cli] ? settings[`default_model_${cli}`] : undefined;
-    if (!CLIS[cli] || !model || !CLIS[cli].models.includes(model)) {
+    const model = getCliModel(cli);
+    if (!model) {
       return reply.code(400).send({
-        error: '문장 훈련에 사용할 기본 CLI와 모델을 설정해 주세요.',
+        error: '문장 훈련에 사용할 기본 CLI를 설정해 주세요.',
         code: 'TRAINING_SETTINGS_REQUIRED',
       });
     }

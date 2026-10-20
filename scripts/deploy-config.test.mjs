@@ -122,11 +122,12 @@ test('workflow clears targeted package caches before rsync when disk or inode us
   assert.match(cliStep, /"\$cli" --version/);
 });
 
-test('manual production verification checks the migrated default, live model call, and storage', () => {
+test('manual production verification checks the server model, live model call, and storage', () => {
   const workflow = read('.github/workflows/verify-model.yml');
 
   assert.match(workflow, /workflow_dispatch:/);
-  assert.match(workflow, /default_model_agy/);
+  assert.match(workflow, /CLIS\.agy\.model/);
+  assert.doesNotMatch(workflow, /SELECT value FROM settings/);
   assert.match(workflow, /gemini-3\.8-flash-low/);
   assert.match(workflow, /agy models/);
   assert.match(workflow, /--effort low/);

@@ -214,7 +214,7 @@ test('POST /api/attempts rejects unknown cli with 400', async (t) => {
   assert.equal(res.statusCode, 400);
 });
 
-test('POST /api/attempts rejects model outside cli allowlist with 400', async (t) => {
+test('audio submission ignores client model selection', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());
   const cat = (await app.inject({ method: 'POST', url: '/api/categories', payload: { type: 'survey', name: '조깅' } })).json();
@@ -226,8 +226,29 @@ test('POST /api/attempts rejects model outside cli allowlist with 400', async (t
   form.append('cli', 'claude');
   form.append('model', 'not-a-real-model; rm -rf /');
   const res = await app.inject({ method: 'POST', url: '/api/attempts', body: form });
-  assert.equal(res.statusCode, 400);
+  assert.equal(res.statusCode, 202);
+  const row = await waitDone(app, `/api/attempts/${res.json().id}`);
+  cleanupUpload(t, row.audio_path);
+  assert.equal(row.status, 'done');
+  assert.equal(row.model, 'claude-sonnet-5');
 });
+
+for (const model of [undefined, 'gpt-5.6-luna', 'arbitrary-model']) {
+  test(`Codex script submission accepts ${model} and evaluates with GPT-6 Luna`, async (t) => {
+    const app = await buildApp({ dbFile: ':memory:' });
+    t.after(() => app.close());
+    const category = app.repos.categories.create({ type: 'survey', name: 'Travel' });
+    const question = app.repos.questions.create({ category_id: category.id, text: 'Describe a trip.' });
+    app.repos.settings.set({ default_model_codex: 'stale-db-value' });
+    const response = await app.inject({ method: 'POST', url: '/api/attempts',
+      payload: { question_id: question.id, script_text: 'I visited Busan.', cli: 'codex', model } });
+    assert.equal(response.statusCode, 202);
+    const row = await waitDone(app, `/api/attempts/${response.json().id}`);
+    assert.equal(row.status, 'done');
+    assert.equal(row.model, 'gpt-6-luna');
+    assert.equal(row.transcript, 'I visited Busan.');
+  });
+}
 
 test('POST /api/attempts with a JSON body skips STT and evaluates the typed script directly', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });

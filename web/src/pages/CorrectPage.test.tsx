@@ -50,10 +50,9 @@ describe('CorrectPage default cli/model', () => {
           { name: 'claude', label: 'Claude', models: ['claude-haiku-4-5-20251001'] },
         ];
       if (path === '/corrections' && init?.method === 'POST') {
-        expect(JSON.parse(init.body as string)).toMatchObject({
+        expect(JSON.parse(init.body as string)).toEqual({
           input_text: 'I go to school yesterday.',
           cli: 'codex',
-          model: 'gpt-5',
         });
         return { id: 1 };
       }

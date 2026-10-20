@@ -100,7 +100,7 @@ test('text-mode attempt retry resets to evaluating (not uploaded) and reruns wit
   assert.equal(retried.transcript, scriptText);
 });
 
-test('retry preserves the model stored on a historical Antigravity attempt', async (t) => {
+test('retry updates a historical Antigravity attempt to the current server model on success', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());
   const category = (await app.inject({ method: 'POST', url: '/api/categories',
@@ -119,8 +119,41 @@ test('retry preserves the model stored on a historical Antigravity attempt', asy
   const retry = await app.inject({ method: 'POST', url: `/api/attempts/${id}/retry` });
   assert.equal(retry.statusCode, 202);
   assert.equal((await waitDone(app, `/api/attempts/${id}`)).status, 'done');
-  assert.equal(app.repos.attempts.get(id).model, 'gemini-3.7-flash');
+  assert.equal(app.repos.attempts.get(id).model, 'gemini-3.8-flash-low');
 });
+
+for (const kind of ['attempts', 'corrections']) {
+  test(`${kind} retries preserve the previous model on failure and update it on success`, async (t) => {
+    const app = await buildApp({ dbFile: ':memory:' });
+    t.after(() => app.close());
+    const input = 'I visited Busan last summer.';
+    let id;
+    if (kind === 'attempts') {
+      const category = app.repos.categories.create({ type: 'survey', name: 'Travel' });
+      const question = app.repos.questions.create({ category_id: category.id, text: 'Describe a trip.' });
+      ({ id } = app.repos.attempts.create({ question_id: question.id, input_mode: 'text',
+        transcript: input, status: 'error', cli: 'codex', model: 'gpt-5.6-luna' }));
+    } else {
+      ({ id } = app.repos.corrections.create({ input_text: input, cli: 'codex', model: 'gpt-5.6-luna' }));
+    }
+    const originalStub = process.env.OPICT_CLI_STUB;
+    try {
+      process.env.OPICT_CLI_STUB = fileURLToPath(new URL('./fixtures/stub-cli-fail.js', import.meta.url));
+      assert.equal((await app.inject({ method: 'POST', url: `/api/${kind}/${id}/retry` })).statusCode, 202);
+      const failed = await waitDone(app, `/api/${kind}/${id}`);
+      assert.equal(failed.status, 'error');
+      assert.equal(failed.model, 'gpt-5.6-luna');
+      process.env.OPICT_CLI_STUB = originalStub;
+      assert.equal((await app.inject({ method: 'POST', url: `/api/${kind}/${id}/retry` })).statusCode, 202);
+      const completed = await waitDone(app, `/api/${kind}/${id}`);
+      assert.equal(completed.status, 'done');
+      assert.equal(completed.model, 'gpt-6-luna');
+      assert.equal(kind === 'attempts' ? completed.transcript : completed.input_text, input);
+    } finally {
+      process.env.OPICT_CLI_STUB = originalStub;
+    }
+  });
+}
 
 test('retry and audio routes return 404 for missing records', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });

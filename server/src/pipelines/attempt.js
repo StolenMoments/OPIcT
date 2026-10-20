@@ -11,14 +11,14 @@ function formatValidationFailure(phase, error) {
   return `${phase} JSON 파싱 실패 또는 Schema 검증 실패 — 자동 재시도 실패 (${error}) — 원문 보기를 확인하세요`;
 }
 
-async function evaluateAttempt(repos, id, transcript) {
+async function evaluateAttempt(repos, id, transcript, model) {
   const row = repos.attempts.get(id);
   const question = repos.questions.get(row.question_id);
   let initialRaw = null;
   try {
     const initial = await runValidatedStage({
       cli: row.cli,
-      model: row.model,
+      model,
       prompt: buildEvalPrompt(question.text, transcript),
       repairPrompt: (error, failedRaw) => buildEvalRepairPrompt(question.text, transcript, error, failedRaw),
       outputSchema: evaluationResultSchema,
@@ -38,7 +38,7 @@ async function evaluateAttempt(repos, id, transcript) {
     repos.attempts.setStatus(id, { status: 'verifying', error_message: null });
     const verified = await runValidatedStage({
       cli: row.cli,
-      model: row.model,
+      model,
       prompt: buildEvalVerificationPrompt(question.text, transcript, initial.value),
       repairPrompt: (error, failedRaw) => buildEvalRepairPrompt(question.text, transcript, error, failedRaw),
       outputSchema: evaluationResultSchema,
@@ -57,6 +57,7 @@ async function evaluateAttempt(repos, id, transcript) {
 
     repos.attempts.setStatus(id, {
       status: 'done',
+      model,
       result_json: JSON.stringify(verified.value),
       raw_output: rawOutput,
       error_message: null,
@@ -71,7 +72,7 @@ async function evaluateAttempt(repos, id, transcript) {
   }
 }
 
-export async function runAttempt(repos, id) {
+export async function runAttempt(repos, id, modelOverride) {
   const row = repos.attempts.get(id);
   try {
     let transcript = row.transcript;
@@ -82,7 +83,7 @@ export async function runAttempt(repos, id) {
       });
       repos.attempts.setStatus(id, { status: 'evaluating', transcript, error_message: null });
     }
-    await evaluateAttempt(repos, id, transcript);
+    await evaluateAttempt(repos, id, transcript, modelOverride ?? row.model);
   } catch (e) {
     repos.attempts.setStatus(id, { status: 'error', result_json: null, error_message: e.message });
   }

@@ -64,7 +64,7 @@ async function prepareApp(t, options = {}) {
   await app.inject({
     method: 'PUT',
     url: '/api/settings',
-    payload: { default_cli: 'claude', default_model_claude: 'claude-sonnet-5' },
+    payload: { default_cli: 'claude' },
   });
   seedSources(app);
   return app;
@@ -417,12 +417,17 @@ test('session material includes a saved note as a source, and editing the note c
   assert.notEqual(beforeVersion, afterVersion);
 });
 
-test('session creation requires configured defaults and training routes are authenticated', async (t) => {
+test('session creation requires a default CLI and ignores stale DB models', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());
   const missing = await app.inject({ method: 'POST', url: '/api/training/sessions' });
   assert.equal(missing.statusCode, 400);
   assert.equal(missing.json().code, 'TRAINING_SETTINGS_REQUIRED');
+  app.repos.settings.set({ default_cli: 'claude', default_model_claude: 'stale-db-model' });
+  const created = await app.inject({ method: 'POST', url: '/api/training/sessions' });
+  assert.equal(created.statusCode, 202);
+  assert.equal(app.repos.training.getSession(created.json().id).model, 'claude-sonnet-5');
+  await waitFor(app, `/api/training/sessions/${created.json().id}`, ['empty', 'ready', 'error']);
 
   const auth = {
     passwordHash: hashPassword('correct-password'),

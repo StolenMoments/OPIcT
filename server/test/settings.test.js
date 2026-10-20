@@ -6,11 +6,11 @@ import { buildApp } from '../src/app.js';
 
 process.env.OPICT_CLI_STUB = fileURLToPath(new URL('./fixtures/stub-cli.js', import.meta.url));
 
-test('Codex corrections use the saved GPT-6 Luna default', async (t) => {
+test('Codex corrections need only a default CLI, not a saved model', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());
   const saved = await app.inject({ method: 'PUT', url: '/api/settings',
-    payload: { default_cli: 'codex', default_model_codex: 'gpt-6-luna' } });
+    payload: { default_cli: 'codex' } });
   assert.equal(saved.statusCode, 200);
   const response = await app.inject({ method: 'POST', url: '/api/corrections',
     payload: { input_text: 'I go yesterday.' } });
@@ -26,6 +26,19 @@ test('Codex corrections use the saved GPT-6 Luna default', async (t) => {
   assert.equal(result.cli, 'codex');
   assert.equal(result.model, 'gpt-6-luna');
   assert.equal(result.status, 'done');
+});
+
+test('legacy model settings are ignored and responses expose server models', async (t) => {
+  const app = await buildApp({ dbFile: ':memory:' });
+  t.after(() => app.close());
+  const response = await app.inject({ method: 'PUT', url: '/api/settings',
+    payload: { default_model_codex: 'arbitrary-model' } });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().default_model_codex, 'gpt-6-luna');
+  assert.equal(app.repos.settings.getAll().default_model_codex, undefined);
+  app.repos.settings.set({ default_model_codex: 'stale-db-value' });
+  const settings = (await app.inject({ url: '/api/settings' })).json();
+  assert.equal(settings.default_model_codex, 'gpt-6-luna');
 });
 
 test('settings upsert and read', async (t) => {
@@ -54,11 +67,12 @@ test('PUT /api/settings rejects unknown default_cli', async (t) => {
   assert.equal(res.statusCode, 400);
 });
 
-test('PUT /api/settings rejects model outside cli allowlist', async (t) => {
+test('PUT /api/settings ignores legacy model selection', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());
   const res = await app.inject({ method: 'PUT', url: '/api/settings', payload: { default_model_claude: 'not-a-real-model' } });
-  assert.equal(res.statusCode, 400);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.json().default_model_claude, 'claude-sonnet-5');
 });
 
 test('PUT /api/settings passes through unrelated keys unvalidated', async (t) => {
@@ -76,12 +90,12 @@ test('PUT /api/settings rejects non-string/nested default_cli', async (t) => {
   assert.equal(res.statusCode, 400);
 });
 
-test('correction: default_cli set but its default_model_<cli> missing rejected with 400', async (t) => {
+test('correction resolves the model when only default_cli is saved', async (t) => {
   const app = await buildApp({ dbFile: ':memory:' });
   t.after(() => app.close());
   await app.inject({ method: 'PUT', url: '/api/settings', payload: { default_cli: 'claude' } });
   const res = await app.inject({ method: 'POST', url: '/api/corrections', payload: { input_text: 'hello' } });
-  assert.equal(res.statusCode, 400);
+  assert.equal(res.statusCode, 202);
 });
 
 test('PUT /api/settings accepts default_input_mode record/text', async (t) => {

@@ -90,7 +90,6 @@ function FreeCorrection({ visible = true }: { visible?: boolean }) {
 
   const [input, setInput] = useState("");
   const [cli, setCli] = useState("");
-  const [model, setModel] = useState("");
   const [jobId, setJobId] = useState<number | null>(null);
   const [active, setActive] = useState(false);
 
@@ -123,7 +122,7 @@ function FreeCorrection({ visible = true }: { visible?: boolean }) {
   // first load. Re-running this whenever the tab becomes visible again
   // picks up a changed default without requiring a full page refresh.
   // Skipped once a correction has been submitted so returning to the tab
-  // doesn't silently swap the cli/model shown next to an in-flight or
+  // doesn't silently swap the CLI shown next to an in-flight or
   // already-answered job.
   useEffect(() => {
     if (!visible) return;
@@ -131,7 +130,6 @@ function FreeCorrection({ visible = true }: { visible?: boolean }) {
       if (jobIdRef.current != null) return;
       if (s.default_cli) {
         setCli(s.default_cli);
-        setModel(s[`default_model_${s.default_cli}`] ?? "");
       }
     });
   }, [visible]);
@@ -148,7 +146,7 @@ function FreeCorrection({ visible = true }: { visible?: boolean }) {
       if (!input.trim()) return;
       const { id } = await api<{ id: number }>("/corrections", {
         method: "POST",
-        body: JSON.stringify({ input_text: input, cli, model }),
+        body: JSON.stringify({ input_text: input, cli }),
       });
       setJobId(id);
       setActive(true);
@@ -175,12 +173,7 @@ function FreeCorrection({ visible = true }: { visible?: boolean }) {
           <div className="section__row">
             <CliPicker
               cli={cli}
-              model={model}
-              showModel={false}
-              onChange={(c, m) => {
-                setCli(c);
-                setModel(m);
-              }}
+              onChange={setCli}
             />
             <Button
               onClick={submit}

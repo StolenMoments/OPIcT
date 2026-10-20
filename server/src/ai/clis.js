@@ -17,10 +17,14 @@ const codexVendor = (triple, arch) =>
   join(npmModules(), '@openai', 'codex', 'node_modules', '@openai',
     `codex-win32-${arch}`, 'vendor', triple, 'bin', 'codex.exe');
 
+export function getCliModel(cli) {
+  return typeof cli === 'string' && Object.hasOwn(CLIS, cli) ? CLIS[cli].model : undefined;
+}
+
 export const CLIS = {
   claude: {
     label: 'Claude Code',
-    models: ['claude-sonnet-5'],
+    model: 'claude-sonnet-5',
     promptMode: 'stdin',
     bin: (platform = process.platform) => platform === 'win32'
       ? [join(home(), '.local', 'bin', 'claude.exe'),
@@ -50,7 +54,7 @@ export const CLIS = {
   },
   codex: {
     label: 'Codex CLI',
-    models: ['gpt-6-luna'],
+    model: 'gpt-6-luna',
     promptMode: 'stdin',
     bin: (platform = process.platform) => platform === 'win32'
       ? [codexVendor('x86_64-pc-windows-msvc', 'x64'),
@@ -64,7 +68,7 @@ export const CLIS = {
   },
   agy: {
     label: 'Antigravity CLI',
-    models: ['gemini-3.8-flash-low'],
+    model: 'gemini-3.8-flash-low',
     promptMode: 'argv',
     bin: (platform = process.platform) => platform === 'win32'
       ? [join(localAppData(), 'agy', 'bin', 'agy.exe'),
