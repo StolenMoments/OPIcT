@@ -84,7 +84,7 @@ test('workflow tests master before deploying and preserves server state during r
   const workflow = read('.github/workflows/deploy.yml');
 
   assert.match(workflow, /branches: \[master\]/);
-  assert.match(workflow, /node-version: ['"]24['"]/);
+  assert.match(workflow, /node-version: ['"]24\.22\.1['"]/);
   assert.match(workflow, /needs: test/);
   assert.match(workflow, /server[\s\S]*npm ci[\s\S]*npm test/);
   assert.match(workflow, /web[\s\S]*npm ci[\s\S]*npm test[\s\S]*npm run build/);
