@@ -1,5 +1,9 @@
 # OPIc Personal Trainer 에이전트 지침
 
+## 서버 접속
+- PowerShell 프로필에 등록된 `opc` 함수를 실행하면 운영 서버에 SSH로 접속할 수 있다.
+- 접속 명령은 `Get-Command opc`로 확인하며, SSH 키나 로컬 개인 경로를 저장소에 기록하지 않는다.
+
 ## 프론트엔드 작업
 - impeccable 스킬들을 적절히 사용할 것.
 
